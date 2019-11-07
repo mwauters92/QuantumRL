@@ -107,15 +107,14 @@ class QuantumEnviroment():
     # FUNCTION THAT I NEED FOR RL
 
     def get_observable(self, state):
-    '''
-       It computes the observable given to the RL algorithm. 
-       In the actual implementation it is just the full state stored in 
-       a real vector.
-       Parameters:
-           state (complex): complex vector of dmnesion self.Hdim describing the system state
-       Returns:
-          obs (real): 2*Hdim long real vector (real(state),imag(state)) 
-    '''
+        '''
+        It computes the observable given to the RL algorithm. 
+        In the actual implementation it is just the full state stored in 
+        a real vector.
+        Parameters:
+            state (complex): complex vector of dmnesion self.Hdim describing the system state
+        Returns:
+        '''     
         state_real = np.real(state)
         state_imag = np.imag(state)
         obs = np.concatenate((state_real, state_imag))
@@ -123,7 +122,7 @@ class QuantumEnviroment():
 
 
     def get_dense_Uevol(self, E, U, dt):
-    '''
+        '''
         Computes the unitary time evolution operator
         Parameters:
             E (real): eigenvalues of of the Hamniltonian that enters the evolution operator
@@ -131,18 +130,18 @@ class QuantumEnviroment():
             dt (real): time step
         Returns:
             exp_H (complex): time evolution operator
-    '''
+        '''
         exp_E = np.exp(-1j * E * dt)
         exp_H = np.dot(U, np.multiply(exp_E[:,None], U.conj().T))
         return exp_H
 
 
     def reset(self):
-    '''
+        '''
         Reset the state to the initial one, with the possible addition of disorder, set by self.noise
         Returns: 
             obs (real): observable of reset state
-    '''
+        '''
         # initialize a new simulation:
         # I will call it after receiving a flag "done"
         self.m = 0
@@ -180,7 +179,7 @@ class QuantumEnviroment():
 
 
     def step(self, action):
-    '''
+        '''
          Update the state according to the action chosen by the RL algorithm
          Parameters:
              action (real): action to be performed on the system. depends on actType
@@ -188,7 +187,7 @@ class QuantumEnviroment():
              obs (real): updated observable of the state
              reward (real): reward of the updated state
              done (bool): if True the episode is over.
-    '''
+        '''
         # here I want the quantum evolution for 1 step, 
         # given the current quantum internal state self.state and the action in input "action"
         # action == 0 -> evolve with H1
