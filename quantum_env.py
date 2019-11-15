@@ -170,7 +170,7 @@ class QuantumEnviroment():
             elif rtype == 'logE':
                 reward = -np.log( 1.e0 - reward + 1.e-8)
             elif rtype == 'expE':
-                reward = np.exp(-2*E)
+                reward = np.exp(-4*E/self.Nhilb)
             else: 
                 reward = 0
                 raise ValueError(f"wrong reward type:{rtype} is not a valid rtype")
@@ -193,7 +193,7 @@ class QuantumEnviroment():
         # action == 0 -> evolve with H1
         # action == 1 -> evolve with H2
         if self.acttype=='bin':
-            #assert action in [0, 1]
+            assert action in [0, 1]
 
             # select the correct Hamiltonian
             if action == 0: 
