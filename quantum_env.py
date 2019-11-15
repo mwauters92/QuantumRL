@@ -170,7 +170,7 @@ class QuantumEnviroment():
             elif rtype == 'logE':
                 reward = -np.log( 1.e0 - reward + 1.e-8)
             elif rtype == 'expE':
-                reward = np.exp(-4*E/self.Nhilb)
+                reward = np.exp(-4*E/self.Hdim)
             else: 
                 reward = 0
                 raise ValueError(f"wrong reward type:{rtype} is not a valid rtype")
