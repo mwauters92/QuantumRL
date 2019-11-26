@@ -3,6 +3,7 @@ import math
 import sys
 from  scipy.linalg import eigh
 import matplotlib.pyplot as plt
+from IPython import embed
 from gym import spaces
 
 # ---------------------------------------
@@ -88,6 +89,7 @@ class QuantumEnviroment():
         self.Hdim = Hz.shape[0]
         self.obs_shape = (2*self.Hdim,)  
         self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=self.obs_shape, dtype=np.float32)
+
         ## IF CYCLE TO SET ACTION TYPE
         if self.acttype == 'bin':
             self.action_space = spaces.Discrete(2) 
@@ -120,6 +122,10 @@ class QuantumEnviroment():
         obs = np.concatenate((state_real, state_imag))
         return obs
 
+    def get_avg_H_target(self, psi):
+        H = self.H_target
+        E = np.real(np.dot(psi.T.conj(), np.dot(H, psi)))
+        return E
 
     def get_dense_Uevol(self, E, U, dt):
         '''
@@ -135,7 +141,6 @@ class QuantumEnviroment():
         exp_H = np.dot(U, np.multiply(exp_E[:,None], U.conj().T))
         return exp_H
 
-
     def reset(self):
         '''
         Reset the state to the initial one, with the possible addition of disorder, set by self.noise
@@ -145,11 +150,10 @@ class QuantumEnviroment():
         # initialize a new simulation:
         # I will call it after receiving a flag "done"
         self.m = 0
-        self.state = np.copy(self.psi_start)+self.noise*np.random.rand(self.Hdim)
-        self.state/=np.sqrt(np.vdot(self.state,self.state))
+        self.state = np.copy(self.psi_start)+self.noise*np.random.random(self.psi_start.shape)
+        self.state /= np.sqrt(np.vdot(self.state,self.state))
         obs = self.get_observable(self.state)
         return obs #not inter. Now gives back reward = 0
-
 
     def get_instantaneous_reward(self, state, m, P,rtype):
         '''
@@ -164,7 +168,7 @@ class QuantumEnviroment():
         '''
         assert m <= P
         if m == P:
-            E = np.real(np.dot(self.state.T.conj(), np.dot(self.H_target, self.state)))
+            E = self.get_avg_H_target(self.state)
             if rtype=='energy':
                 reward = - E
             elif rtype == 'logE':
@@ -197,15 +201,15 @@ class QuantumEnviroment():
 
             # select the correct Hamiltonian
             if action == 0: 
-                U = self.get_dense_Uevol(self.E1, self.U1, self.dt)
+                U = self.np.dot(self.E1, self.U1, self.dt)
             elif action >= 1: 
-                U = self.get_dense_Uevol(self.E2, self.U2, self.dt)
+                U = self.np.dot(self.E2, self.U2, self.dt)
       
             # apply the Hamiltonian evolution
             self.state = np.dot(U, self.state)
         elif self.acttype=='cont':  
-            # continuous action below
-            action = np.clip(action, 0, np.pi*self.Hdim)
+            # continuous action below ######## ????? why Hdim ###############################
+            # action = np.clip(action, 0, np.pi*self.Hdim)
  
             # apply the Hamiltonian evolution
 
@@ -311,4 +315,99 @@ class SingleSpin(QuantumEnviroment):
 # end of class SingleSpin
 # ------------------------------------
 
+#-------------------------------------
+# Model class for single spin 1/2
+#-------------------------------------
+class TFIM(QuantumEnviroment):
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0):
+    '''Child class of QuantumEnviroment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
+       Paramenters:
+           N (int): number of spin variables
+       
+       Methods:
+           get_full_state: returns the state of the whole ising model
+    '''
+        # initilize model variables
+        self.N = N
+        self.k = np.pi / self.N * np.arange(1., self.N, 2)
+        self.Nk = self.k.shape[0]
+        self.state = None
+        self.m = 0
+        self.P = P
+        self.rtype = rtype
+        self.noise = noise
+        self.dt = dt
+        self.two_lv_models = []
+        self.obs_shape = (2 * 2 * self.Nk,)
+        self.set_RL_params(acttype, self.obs_shape)
+
+        # define 2 level systems, the equations are taken from arXiv:1906.08948
+        for i_k in range(self.Nk):
+            k = self.k[i_k]
+            Hx = -2 * SIGMA_Z
+            Hz = 2 * np.sin(k) * SIGMA_X - 2 * np.cos(k) * SIGMA_Z
+            model = QuantumEnviroment(P, rtype, dt, acttype, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
+            self.two_lv_models.append(model)
+
+    def set_RL_params(self, acttype, obs_shape):
+        '''
+        Sets additional parameters needed by the Reinforment Learning algorithm
+        '''
+        self.acttype = acttype
+        self.obs_shape = obs_shape
+        self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=self.obs_shape, dtype=np.float32)
+
+        ## IF CYCLE TO SET ACTION TYPE
+        if self.acttype == 'bin':
+            self.action_space = spaces.Discrete(2) 
+        elif self.acttype == 'cont':
+            # TODO issue with action space
+            self.action_space = spaces.Box(low= 0., high=2*np.pi, shape=(2,), dtype=np.float32)
+
+    def get_full_state(self):
+        two_lv_states = [model.state for model in self.two_lv_models]
+        return np.array(two_lv_states)
+
+    def get_avg_H_target(self, state):
+        E = 0.
+        for i_k in range(self.Nk):
+            two_lv_state = state[i_k]
+            two_lv_model = self.two_lv_models[i_k]
+            E = E + two_lv_model.get_avg_H_target(two_lv_state)
+        return E
+
+    def step(self, action):
+        '''
+         Update the state according to the action chosen by the RL algorithm
+         Parameters:
+             action (real): action to be performed on the system. depends on actType
+         Returns:
+             obs (real): updated observable of the state
+             reward (real): reward of the updated state
+             done (bool): if True the episode is over.
+        '''
+        for model in self.two_lv_models: 
+            model.step(action)
+        # this part is the same for both binary and blabla
+        self.state = self.get_full_state()
+        obs = self.get_observable(self.state)
+        self.m += 1
+        if self.m == self.P: done = True
+        else: done = False
+        rewards = self.get_instantaneous_reward(self.state, self.m, self.P, self.rtype)
+        return np.array(obs), rewards, done, {}
+
+    def reset(self):
+        '''
+        Reset the state to the initial one, with the possible addition of disorder, set by self.noise
+        Returns: 
+            obs (real): observable of reset state
+        '''
+        for model in self.two_lv_models:
+            model.reset()
+        self.m = 0
+        self.state = self.get_full_state()
+        obs = self.get_observable(self.state)
+        return obs #not inter. Now gives back reward = 0
+ 
 
