@@ -120,7 +120,7 @@ class QuantumEnviroment():
         state_real = np.real(state)
         state_imag = np.imag(state)
         obs = np.concatenate((state_real, state_imag))
-        return obs
+        return obs.reshape(-1)
 
     def get_avg_H_target(self, psi):
         H = self.H_target
@@ -319,7 +319,6 @@ class SingleSpin(QuantumEnviroment):
 # Model class for single spin 1/2
 #-------------------------------------
 class TFIM(QuantumEnviroment):
-    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0):
     '''Child class of QuantumEnviroment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
        Paramenters:
            N (int): number of spin variables
@@ -327,6 +326,7 @@ class TFIM(QuantumEnviroment):
        Methods:
            get_full_state: returns the state of the whole ising model
     '''
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0):
         # initilize model variables
         self.N = N
         self.k = np.pi / self.N * np.arange(1., self.N, 2)
