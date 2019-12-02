@@ -70,7 +70,7 @@ class QuantumEnviroment():
         render: does nothing but it is required by the RL algorithm
     Please notice that all methods but get_dense_Uevol are necessary for spinningup
     '''
-    def __init__(self, P, rtype, dt, acttype, g_target = 0, noise=0, Hx = None, Hz = None):
+    def __init__(self, P, rtype, dt, acttype, N=1, g_target = 0, noise=0, Hx = None, Hz = None):
 
         # here all variables for you
         self.state = None
@@ -80,12 +80,13 @@ class QuantumEnviroment():
         self.noise=noise
         self.dt = dt
         self.acttype = acttype
+        self.Npart = N        
 
         self.H1 = Hz
         self.H2 = Hx
         self.H_target = Hz + g_target * Hx
         self.H_start = Hx
-
+        
         self.Hdim = Hz.shape[0]
         self.obs_shape = (2*self.Hdim,)  
         self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=self.obs_shape, dtype=np.float32)
@@ -174,7 +175,7 @@ class QuantumEnviroment():
             elif rtype == 'logE':
                 reward = -np.log( 1.e0 - reward + 1.e-8)
             elif rtype == 'expE':
-                reward = np.exp(-4*E/self.Hdim)
+                reward = np.exp(-4*E/self.Npart)
             else: 
                 reward = 0
                 raise ValueError(f"wrong reward type:{rtype} is not a valid rtype")
@@ -209,7 +210,7 @@ class QuantumEnviroment():
             self.state = np.dot(U, self.state)
         elif self.acttype=='cont':  
             # continuous action below ######## ????? why Hdim ###############################
-            # action = np.clip(action, 0, np.pi*self.Hdim)
+            action = np.clip(action, 0, 2*np.pi)
  
             # apply the Hamiltonian evolution
 
@@ -259,7 +260,7 @@ class pSpin(QuantumEnviroment):
         
         Hx = -self.xSpin(N,0)
         Hz = self.pspinHz(N,ps)
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
+        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
    
     def pspinHz(self,N,p):
         """Construct the x and z Hamiltonian fo the pspin model
