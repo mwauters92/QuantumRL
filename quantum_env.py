@@ -128,6 +128,10 @@ class QuantumEnviroment():
         E = np.real(np.dot(psi.T.conj(), np.dot(H, psi)))
         return E
 
+    def get_quantum_exect_val(self, Op, psi):
+        expect_val = np.real(np.dot(psi.T.conj(), np.dot(Op, psi)))
+        return expect_val
+
     def get_dense_Uevol(self, E, U, dt):
         '''
         Computes the unitary time evolution operator
@@ -323,11 +327,15 @@ class TFIM(QuantumEnviroment):
     '''Child class of QuantumEnviroment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
        Paramenters:
            N (int): number of spin variables
+           measured_obs (str): 
+            "pesudo-spin-tomograpy" ->
+            "sx,sz*sz" -> local observables O_x = sigma_x, O_zz = sigma_z*sigma_z
+
        
        Methods:
            get_full_state: returns the state of the whole ising model
     '''
-    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0):
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="pesudo-spin-tomograpy"):
         # initilize model variables
         self.N = N
         self.k = np.pi / self.N * np.arange(1., self.N, 2)
@@ -339,7 +347,10 @@ class TFIM(QuantumEnviroment):
         self.noise = noise
         self.dt = dt
         self.two_lv_models = []
-        self.obs_shape = (2 * 2 * self.Nk,)
+        self.Hx = []
+        self.Hz = []
+        self.measured_obs = measured_obs
+        self.obs_shape = get_observable_shape()
         self.set_RL_params(acttype, self.obs_shape)
 
         # define 2 level systems, the equations are taken from arXiv:1906.08948
@@ -349,6 +360,8 @@ class TFIM(QuantumEnviroment):
             Hz = 2 * np.sin(k) * SIGMA_X - 2 * np.cos(k) * SIGMA_Z
             model = QuantumEnviroment(P, rtype, dt, acttype, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
             self.two_lv_models.append(model)
+            self.Hx.append(Hx)
+            self.Hx.append(Hz)
 
     def set_RL_params(self, acttype, obs_shape):
         '''
@@ -411,4 +424,47 @@ class TFIM(QuantumEnviroment):
         obs = self.get_observable(self.state)
         return obs #not inter. Now gives back reward = 0
  
+    def get_observable(self, state, only_shape=False):
+        if self.measured_obs == "pesudospin-tomograpy":
+            if only_shape: 
+                obs_shape = (2 * 2 * self.Nk,)
+                return obs_shape
+            state_real = np.real(state)
+            state_imag = np.imag(state)
+            obs = np.concatenate((state_real, state_imag))
+
+        elif self.measured_obs == "sx,sz*sz":
+            # get observable shape
+            if only_shape: return obs_shape
+                obs_shape = (2 * self.N,)
+                return obs_shape
+            # get averages of Hx and Hz
+            avg_Hx = 0.
+            avg_Hz = 0.
+            for i_k in range(self.Nk):
+                two_lv_state = state[i_k]
+                two_lv_model = self.two_lv_models[i_k]
+                Hx_k = self.Hx[i_k]
+                Hz_k = self.Hz[i_k]
+                avg_Hx = avg_Hx + two_lv_model.get_quantum_exect_val(Hx_k, two_lv_state)
+                avg_Hz = avg_Hz + two_lv_model.get_quantum_exect_val(Hz_k, two_lv_state)
+            
+            # get  averages 
+            avg_sum_sx = -avg_Hx
+            avg_sum_szsz = avg_Hz
+
+            # get local observables for each site
+            obs_x = (avg_sum_sx / self.N) * np.ones(self.N)
+            obs_zz = (avg_sum_szsz / self.N) * np.ones(self.N)
+            obs = np.concatenate([obs_x, obs_zz])
+
+        else:
+            raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
+
+        return obs.reshape(-1)
+
+    def get_observable_shape(self):
+        return self.get_observable(state, only_shape=True)
+
+
 
