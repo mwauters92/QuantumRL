@@ -89,6 +89,7 @@ class QuantumEnviroment():
         
         self.Hdim = Hz.shape[0]
         self.obs_shape = (2*self.Hdim,)  
+  
         self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=self.obs_shape, dtype=np.float32)
 
         ## IF CYCLE TO SET ACTION TYPE
@@ -108,6 +109,23 @@ class QuantumEnviroment():
         self.E2, self.U2 = eigh(self.H2)
 
     # FUNCTION THAT I NEED FOR RL
+
+    def set_RL_params(self, acttype, obs_shape, obs_low, obs_high):
+        '''
+        Sets additional parameters needed by the Reinforment Learning algorithm
+        '''
+        self.acttype = acttype
+        self.obs_shape = obs_shape
+        self.obs_low = obs_low
+        self.obs_high = obs_high
+        self.observation_space = spaces.Box(low=obs_low, high=obs_high, shape=self.obs_shape, dtype=np.float32)
+        print('SELF_OBS_SPACE',self.observation_space)
+        ## IF CYCLE TO SET ACTION TYPE
+        if self.acttype == 'bin':
+            self.action_space = spaces.Discrete(2) 
+        elif self.acttype == 'cont':
+            # TODO issue with action space
+            self.action_space = spaces.Box(low= 0., high=2*np.pi, shape=(2,), dtype=np.float32)
 
     def get_observable(self, state):
         '''
@@ -260,11 +278,18 @@ class pSpin(QuantumEnviroment):
            xSpin: contruct the  x-component of the global spin operator 
     '''
 
-    def __init__(self, N, ps, P, rtype, dt, acttype, g_target = 0, noise=0):
+    def __init__(self, N, ps, P, rtype, dt, acttype, g_target = 0, noise=0,measured_obs='tomography'):
         
-        Hx = -self.xSpin(N,0)
-        Hz = self.pspinHz(N,ps)
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
+        self.Hx = -self.xSpin(N,0)
+        self.Hz = self.pspinHz(N,ps)
+        self.N=N
+        self.ps=ps
+        self.P=P
+        self.measured_obs=measured_obs
+        self.acttype=acttype
+        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = self.Hx, Hz = self.Hz)
+        self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
+        self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
    
     def pspinHz(self,N,p):
         """Construct the x and z Hamiltonian fo the pspin model
@@ -298,6 +323,50 @@ class pSpin(QuantumEnviroment):
             return Sx, Usx
         elif(job==0):
             return(Sx)
+
+    def get_observable(self, state, get_only_info=False):
+        if self.measured_obs == "tomography":
+            if get_only_info:
+                obs_shape = (2 *  self.N+2,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            state_real = np.real(state)
+            state_imag = np.imag(state)
+            obs = np.concatenate((state_real, state_imag))
+
+        elif self.measured_obs == "Hx/N,Hz/N":
+            # get observable shape
+            if get_only_info:
+                obs_shape = (2,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            # get averages of Hx and Hz
+            avg_Hx = np.vdot(state,np.dot(self.Hx,state)) 
+            avg_Hz = np.vdot(state,np.dot(self.Hz,state)) 
+            obs = np.array([avg_Hx, avg_Hz])/self.N
+
+        elif self.measured_obs =='sz_distribution':
+            if get_only_info:
+                obs_shape = (self.N+1,)
+                obs_low = 0
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            obs=np.abs(state)**2
+       
+        else:
+            raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
+
+        return obs.reshape(-1)
+
+
+    def get_observable_info(self):
+        return self.get_observable(None, get_only_info=True)
+
+        
+            
+
 #------------------------------------------------------------
 # End of pSpin class
 #-----------------------------------------------------------
@@ -328,14 +397,14 @@ class TFIM(QuantumEnviroment):
        Paramenters:
            N (int): number of spin variables
            measured_obs (str): 
-            "pesudo-spin-tomograpy" ->
+            "pesudospin-tomography" ->
             "sx,sz*sz" -> local observables O_x = sigma_x, O_zz = sigma_z*sigma_z
 
        
        Methods:
            get_full_state: returns the state of the whole ising model
     '''
-    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="pesudo-spin-tomograpy"):
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="pseudospin-tomography"):
         # initilize model variables
         self.N = N
         self.k = np.pi / self.N * np.arange(1., self.N, 2)
@@ -350,8 +419,9 @@ class TFIM(QuantumEnviroment):
         self.Hx = []
         self.Hz = []
         self.measured_obs = measured_obs
-        self.obs_shape = get_observable_shape()
-        self.set_RL_params(acttype, self.obs_shape)
+        self.acttype=acttype
+        self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
+        self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
 
         # define 2 level systems, the equations are taken from arXiv:1906.08948
         for i_k in range(self.Nk):
@@ -361,22 +431,8 @@ class TFIM(QuantumEnviroment):
             model = QuantumEnviroment(P, rtype, dt, acttype, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
             self.two_lv_models.append(model)
             self.Hx.append(Hx)
-            self.Hx.append(Hz)
+            self.Hz.append(Hz)
 
-    def set_RL_params(self, acttype, obs_shape):
-        '''
-        Sets additional parameters needed by the Reinforment Learning algorithm
-        '''
-        self.acttype = acttype
-        self.obs_shape = obs_shape
-        self.observation_space = spaces.Box(low=-1.0, high=1.0, shape=self.obs_shape, dtype=np.float32)
-
-        ## IF CYCLE TO SET ACTION TYPE
-        if self.acttype == 'bin':
-            self.action_space = spaces.Discrete(2) 
-        elif self.acttype == 'cont':
-            # TODO issue with action space
-            self.action_space = spaces.Box(low= 0., high=2*np.pi, shape=(2,), dtype=np.float32)
 
     def get_full_state(self):
         two_lv_states = [model.state for model in self.two_lv_models]
@@ -424,26 +480,32 @@ class TFIM(QuantumEnviroment):
         obs = self.get_observable(self.state)
         return obs #not inter. Now gives back reward = 0
  
-    def get_observable(self, state, only_shape=False):
-        if self.measured_obs == "pesudospin-tomograpy":
-            if only_shape: 
+    def get_observable(self, state, get_only_info=False):
+        if self.measured_obs == "tomography":
+            if get_only_info: 
+                obs_low=-1
+                obs_high=1
                 obs_shape = (2 * 2 * self.Nk,)
-                return obs_shape
+                return obs_shape, obs_low, obs_high
             state_real = np.real(state)
             state_imag = np.imag(state)
             obs = np.concatenate((state_real, state_imag))
 
         elif self.measured_obs == "sx,sz*sz":
             # get observable shape
-            if only_shape: return obs_shape
+            if get_only_info:
                 obs_shape = (2 * self.N,)
-                return obs_shape
+                obs_low=-1
+                obs_high=1
+                obs_shape = (2,) #delete in future
+                return obs_shape, obs_low, obs_high
             # get averages of Hx and Hz
             avg_Hx = 0.
             avg_Hz = 0.
             for i_k in range(self.Nk):
                 two_lv_state = state[i_k]
                 two_lv_model = self.two_lv_models[i_k]
+                #print('i_k=',i_k,' Nk=', self.Nk, ' lenHx=',len(self.Hx), ' lenHz=',len(self.Hz))
                 Hx_k = self.Hx[i_k]
                 Hz_k = self.Hz[i_k]
                 avg_Hx = avg_Hx + two_lv_model.get_quantum_exect_val(Hx_k, two_lv_state)
@@ -457,14 +519,15 @@ class TFIM(QuantumEnviroment):
             obs_x = (avg_sum_sx / self.N) * np.ones(self.N)
             obs_zz = (avg_sum_szsz / self.N) * np.ones(self.N)
             obs = np.concatenate([obs_x, obs_zz])
+            obs = np.array([avg_sum_sx, avg_sum_szsz])/self.N #delete in future  
 
         else:
             raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
 
         return obs.reshape(-1)
 
-    def get_observable_shape(self):
-        return self.get_observable(state, only_shape=True)
+    def get_observable_info(self):
+        return self.get_observable(None, get_only_info=True)
 
 
 
