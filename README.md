@@ -11,6 +11,7 @@ RunningRL.py
   by default if trains an RL agent on the single spin 1/2 with continuous actions, if no in-line options are give.
   type python RunningRL.py --help to see all possible arguments to pass to the program
   
-test_quantum.py(obsolete) 
+test_quantum.py 
   run a trained version of the network. It needs the directory where the model has been saved.
   It writes s file with the actions perfomed during several episodes (actions.dat) and a summary file with the average performances (summary.dat)
+  It has the same default options of RunningRL.py, plus an extra arguments that sets the number of validation steps.
