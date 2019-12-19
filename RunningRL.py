@@ -52,7 +52,7 @@ for Nt in P:
       dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
       raise ValueError(f'Invalid model:{model}')
-    dirOut += '/network'+str(layers[0])+'x'+str(layers[1])
+    dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
     ac_kwargs = dict(hidden_sizes=layers, activation=tf.nn.relu)
     logger_kwargs = dict(output_dir=dirOut, exp_name='RL_first_try')
     ppo(env_fn=env_fn, ac_kwargs=ac_kwargs, steps_per_epoch=nstep, epochs=epochs, logger_kwargs=logger_kwargs, gamma=1.0)
