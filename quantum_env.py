@@ -335,7 +335,7 @@ class pSpin(QuantumEnviroment):
             state_imag = np.imag(state)
             obs = np.concatenate((state_real, state_imag))
 
-        elif self.measured_obs == "Hx/N,Hz/N":
+        elif self.measured_obs == "Hobs":
             # get observable shape
             if get_only_info:
                 obs_shape = (2,)
@@ -404,7 +404,7 @@ class TFIM(QuantumEnviroment):
        Methods:
            get_full_state: returns the state of the whole ising model
     '''
-    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="pseudospin-tomography"):
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="tomography"):
         # initilize model variables
         self.N = N
         self.k = np.pi / self.N * np.arange(1., self.N, 2)
@@ -491,7 +491,7 @@ class TFIM(QuantumEnviroment):
             state_imag = np.imag(state)
             obs = np.concatenate((state_real, state_imag))
 
-        elif self.measured_obs == "sx,sz*sz":
+        elif self.measured_obs == "Hobs":
             # get observable shape
             if get_only_info:
                 obs_shape = (2 * self.N,)
