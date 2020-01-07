@@ -47,7 +47,7 @@ nstep=args.nstep                      # steps per episodes
 layers=args.network
 
 # physical parameters
-Ns=[args.N]
+Ns=args.N
 ps=args.ps                      # interaction rank of the pSpin model
 Na=args.nvalidation
 
@@ -67,7 +67,8 @@ for Nt in P:
     else:
         raise ValueError(f'Model not implemented:{model}')
     
-    dirOut += '/network'+str(layers[0])+'x'+str(layers[1])        
+    #dirOut += '/network'+str(layers[0])+'x'+str(layers[1])        
+    dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
 
     _, get_action = load_policy('./'+dirOut)
 
