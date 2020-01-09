@@ -102,7 +102,8 @@ for Nt in P:
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r, rew2en(r,rtype,Ns)])
             summary[ep,:]=np.array([ep,r,rew2en(r,rtype,Ns),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
         summary[-1,:]=summary[:-1,:].mean(axis=0)
+        summary[-1,0]=summary[:-1,2].min()
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
         head='# 1-episode,  2-reward 3-energy, 4-time'
-        np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%03d  %.6e  %.6e  %.6e'  ) 
+        np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%.6e  %.6e  %.6e  %.6e'  ) 
 
