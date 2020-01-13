@@ -34,6 +34,7 @@ parser.add_argument('--nstep', default=1024, type=int, help="Number of steps per
 parser.add_argument('--nvalidation', default=20, type=int, help="Number of validation episodes")
 parser.add_argument('--N', default=32, type=int, help="System size (only for pSpin and TFIM)")
 parser.add_argument('--ps', default=2, type=int, help="Interaction rank (only for pSpin)")
+parser.add_argument('--plotP', default=False, type=bool, help="if True prints a file with the state value function of in the observation space")
 args = parser.parse_args()
 
 actType=args.actType                 # action type: bin, cont
@@ -47,6 +48,11 @@ epochs=args.epochs                      # number of epochs
 nstep=args.nstep                      # steps per episodes
 layers=args.network
 deterministic_act=args.deterministic
+
+if measured_obs == 'Hobs':
+    plotSValue=args.plotP
+else:
+    plotSValue=False
 
 # physical parameters
 Ns=args.N
@@ -72,7 +78,7 @@ for Nt in P:
     #dirOut += '/network'+str(layers[0])+'x'+str(layers[1])        
     dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
 
-    _, get_action = load_policy('./'+dirOut,deterministic=deterministic_act)
+    _, get_action, get_value = load_policy('./'+dirOut,deterministic=deterministic_act, valueFunction=plotSValue)
 
     if actType=='bin':
         head='# 1-episode,  2-action, 3-reward, 4-energy'
@@ -108,4 +114,13 @@ for Nt in P:
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
         head='# 1-episode,  2-reward 3-energy, 4-time'
         np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%.6e  %.6e  %.6e  %.6e'  ) 
+        if plotSValue:
+            value = []
+            for ozz in np.linspace(-1,1,100):
+                for ox in np. linspace(0,1,100):
+                    o=np.array([ox,ozz])
+                    a = np.clip(get_action(o), 0, np.pi*2)
+                    value.append(np.array([ox,ozz,get_value(o),a[0], a[1]]))
+            np.savetxt(dirOut+"/valueFunction.dat",value, header=head,fmt='%.6e  %.6e  %.6e  %.6e  %.6e'  ) 
+            
 
