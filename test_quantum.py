@@ -27,6 +27,7 @@ parser.add_argument('--actType', default="cont", type=str, help="action space of
 parser.add_argument('--tau', default=10, type=float, help="total time for binary actions")
 parser.add_argument('--Pvars', default=[2,3,1], nargs=3, type=int, help="episodes lengths (start,stop,step)")
 parser.add_argument('--network', default=[16,16],nargs='+', type=int, help="Number of neurons in each layer")
+parser.add_argument('--deterministic', default = False , type=bool, help="Validation with deterministic actions")
 parser.add_argument('--rtype', default="energy", type=str, help="reward function (energy, expE or logE")
 parser.add_argument('--epochs', default=512, type=int, help="Number of epochs of the training process")
 parser.add_argument('--nstep', default=1024, type=int, help="Number of steps per epoch")
@@ -45,6 +46,7 @@ rtype =args.rtype                 #reward types: energy, logE, expE
 epochs=args.epochs                      # number of epochs
 nstep=args.nstep                      # steps per episodes
 layers=args.network
+deterministic_act=args.deterministic
 
 # physical parameters
 Ns=args.N
@@ -70,7 +72,7 @@ for Nt in P:
     #dirOut += '/network'+str(layers[0])+'x'+str(layers[1])        
     dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
 
-    _, get_action = load_policy('./'+dirOut)
+    _, get_action = load_policy('./'+dirOut,deterministic=deterministic_act)
 
     if actType=='bin':
         head='# 1-episode,  2-action, 3-reward, 4-energy'
