@@ -178,7 +178,7 @@ class QuantumEnviroment():
         obs = self.get_observable(self.state)
         return obs #not inter. Now gives back reward = 0
 
-    def get_instantaneous_reward(self, state, m, P,rtype):
+    def get_instantaneous_reward(self, state, m, P,rtype, N=1):
         '''
         From the state computes the instantaneous reward
         Parameters:
@@ -186,6 +186,7 @@ class QuantumEnviroment():
             m (int): step during the episode
             P (int): length of the episode
             rtype (string): sets the type of reward given (energy,logE,expE)
+            N (int): normalization factor for the energy (default 1)
         Returns:
             reward (real): the reawrd is given only at the end of the episode. It is a function of the system energy at the end of the process. 
         '''
@@ -197,7 +198,7 @@ class QuantumEnviroment():
             elif rtype == 'logE':
                 reward = -np.log( 1.e0 - reward + 1.e-8)
             elif rtype == 'expE':
-                reward = np.exp(-4*E/self.Npart)
+                reward = np.exp(-4*E/N)
             else: 
                 reward = 0
                 raise ValueError(f"wrong reward type:{rtype} is not a valid rtype")
@@ -249,7 +250,7 @@ class QuantumEnviroment():
         self.m += 1
         if self.m == self.P: done = True
         else: done = False
-        rewards = self.get_instantaneous_reward(self.state, self.m, self.P, self.rtype)
+        rewards = self.get_instantaneous_reward(self.state, self.m, self.P, self.rtype, N=self.Npart)
         return np.array(obs), rewards, done, {}
 
     def close(self):
@@ -322,7 +323,7 @@ class pSpin(QuantumEnviroment):
             _,Usx=eigh(Sx)
             return Sx, Usx
         elif(job==0):
-            return(Sx)
+            return Sx
 
     def get_observable(self, state, get_only_info=False):
         if self.measured_obs == "tomography":
@@ -464,7 +465,7 @@ class TFIM(QuantumEnviroment):
         self.m += 1
         if self.m == self.P: done = True
         else: done = False
-        rewards = self.get_instantaneous_reward(self.state, self.m, self.P, self.rtype)
+        rewards = self.get_instantaneous_reward(self.state, self.m, self.P, self.rtype, self.N)
         return np.array(obs), rewards, done, {}
 
     def reset(self):
