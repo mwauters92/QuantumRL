@@ -13,7 +13,7 @@ def rew2en(reward, rtype, N=2):
     if rtype == 'energy':
         return -reward
     elif rtype == 'expE':
-        return -0.25*np.log(reward)*(N-1)
+        return -0.25*np.log(reward)*(N)
     elif rtype == 'logE':
         return 1.0-np.exp(-reward)
     else:
@@ -77,7 +77,7 @@ for Nt in P:
     
     #dirOut += '/network'+str(layers[0])+'x'+str(layers[1])        
     dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
-
+    print(deterministic_act, plotSValue) 
     _, get_action, get_value = load_policy('./'+dirOut,deterministic=deterministic_act, valueFunction=plotSValue)
 
     if actType=='bin':
