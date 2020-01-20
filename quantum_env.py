@@ -1,7 +1,7 @@
 import numpy as np
 import math
 import sys
-from  scipy.linalg import eigh
+from  scipy.linalg import eigh, toeplitz, det
 import matplotlib.pyplot as plt
 from IPython import embed
 from gym import spaces
@@ -522,13 +522,61 @@ class TFIM(QuantumEnviroment):
             obs = np.concatenate([obs_x, obs_zz])
             obs = np.array([avg_sum_sx, avg_sum_szsz])/self.N #delete in future  
 
+        elif self.measured_obs == "HCorr":
+            # get observable shape
+            if get_only_info:
+                obs_low=-1
+                obs_high=1
+                obs_shape = (3,) #delete in future
+                return obs_shape, obs_low, obs_high
+            # get averages of Hx and Hz
+            avg_Hx = 0.
+            avg_Hz = 0.
+            for i_k in range(self.Nk):
+                two_lv_state = state[i_k]
+                two_lv_model = self.two_lv_models[i_k]
+                #print('i_k=',i_k,' Nk=', self.Nk, ' lenHx=',len(self.Hx), ' lenHz=',len(self.Hz))
+                Hx_k = self.Hx[i_k]
+                Hz_k = self.Hz[i_k]
+                avg_Hx = avg_Hx + two_lv_model.get_quantum_exect_val(Hx_k, two_lv_state)
+                avg_Hz = avg_Hz + two_lv_model.get_quantum_exect_val(Hz_k, two_lv_state)
+            
+            # get  averages 
+            avg_sum_sx = -avg_Hx
+            avg_sum_szsz = avg_Hz
+            avg_sum_corrZ_2 = self.get_correlation(state,2)/self.N
+            # get local observables for each site
+            obs = np.array([avg_sum_sx, avg_sum_szsz, avg_sum_corrZ_2])/self.N #delete in future  
+
         else:
             raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
 
         return obs.reshape(-1)
-
+    
     def get_observable_info(self):
         return self.get_observable(None, get_only_info=True)
 
+    def get_correlation(self, state, n):
+        """
+        Computes the correlation at distance n on the TFIM model
+        """
+        corr_mat=np.zeros([n,n])
+        for i_n in np.arange(0,n):
+            Gn=0.
+            Gn_m=0.
+            for i_k in range(self.Nk):
+                k=self.k[i_k]
+                two_lv_state = state[i_k]
+                two_lv_model = self.two_lv_models[i_k]
+                Gzk = 2 * np.sin((i_n+1)*k) * SIGMA_X - 2 * np.cos((i_n+1)*k) * SIGMA_Z
+                Gzk_m = -2 * np.sin(i_n*k) * SIGMA_X - 2 * np.cos(i_n*k) * SIGMA_Z
+                Gn = Gn + two_lv_model.get_quantum_exect_val(Gzk, two_lv_state)
+                Gn_m = Gn_m + two_lv_model.get_quantum_exect_val(Gzk_m, two_lv_state)
+        
+            for j_n in range(n-i_n):
+                corr_mat[j_n,j_n+i_n]=Gn
+                if j_n+i_n+1 < n : corr_mat[j_n+i_n+1,j_n+i_n]=Gn_m
+        
+        return det(corr_mat)
 
 
