@@ -100,6 +100,7 @@ for Nt in P:
     elif actType=='cont':
         head='# 1-episode,  2-action-gamma, 3-action-beta, 4-reward, 5-energy'
         data=np.zeros([Na*Nt,5])
+        dynamics=np.zeros([Na*Nt,1+env.obs_shape[0]])
         summary=np.zeros([Na+1,4])
         for ep in range(Na):
             o = env.reset()
@@ -108,12 +109,16 @@ for Nt in P:
                 a = get_action(o)
                 o, r, d, _ = env.step(a)
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r, rew2en(r,rtype,Ns)])
+                dynamics[ep*Nt+i,:]=np.concatenate(([ep],o))
+
             summary[ep,:]=np.array([ep,r,rew2en(r,rtype,Ns),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
         head='# 1-episode,  2-reward 3-energy, 4-time'
         np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%.6e  %.6e  %.6e  %.6e'  ) 
+        head='# 1-episode,  2-s_x, 3-szsz, 4- corr 2'
+        np.savetxt(dirOut+"/dynamics.dat",dynamics, header=head  ) 
         if plotSValue:
             value = []
             for ozz in np.linspace(-1,1,100):
