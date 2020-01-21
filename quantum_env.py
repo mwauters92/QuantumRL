@@ -545,7 +545,7 @@ class TFIM(QuantumEnviroment):
             # get  averages 
             avg_sum_sx = -avg_Hx
             avg_sum_szsz = avg_Hz
-            avg_sum_corrZ_2 = self.get_correlation(state,2)
+            avg_sum_corrZ_2 = self.get_correlation(state,2)*self.N
             # get local observables for each site
             obs = np.array([avg_sum_sx, avg_sum_szsz, avg_sum_corrZ_2])/self.N #delete in future  
 
