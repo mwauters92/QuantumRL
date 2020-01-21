@@ -413,6 +413,7 @@ class TFIM(QuantumEnviroment):
         self.state = None
         self.m = 0
         self.P = P
+        self.g_target=g_target
         self.rtype = rtype
         self.noise = noise
         self.dt = dt
@@ -429,7 +430,7 @@ class TFIM(QuantumEnviroment):
             k = self.k[i_k]
             Hx = -2 * SIGMA_Z
             Hz = 2 * np.sin(k) * SIGMA_X - 2 * np.cos(k) * SIGMA_Z
-            model = QuantumEnviroment(P, rtype, dt, acttype, g_target = 0, noise=0, Hx = Hx, Hz = Hz)
+            model = QuantumEnviroment(P, rtype, dt, acttype, g_target = g_target, noise=0, Hx = Hx, Hz = Hz)
             self.two_lv_models.append(model)
             self.Hx.append(Hx)
             self.Hz.append(Hz)
@@ -544,7 +545,7 @@ class TFIM(QuantumEnviroment):
             # get  averages 
             avg_sum_sx = -avg_Hx
             avg_sum_szsz = avg_Hz
-            avg_sum_corrZ_2 = self.get_correlation(state,2)/self.N
+            avg_sum_corrZ_2 = self.get_correlation(state,2)
             # get local observables for each site
             obs = np.array([avg_sum_sx, avg_sum_szsz, avg_sum_corrZ_2])/self.N #delete in future  
 
@@ -561,6 +562,8 @@ class TFIM(QuantumEnviroment):
         Computes the correlation at distance n on the TFIM model
         """
         corr_mat=np.zeros([n,n])
+        corr_row=[]
+        corr_col=[0]
         for i_n in np.arange(0,n):
             Gn=0.
             Gn_m=0.
@@ -572,11 +575,16 @@ class TFIM(QuantumEnviroment):
                 Gzk_m = -2 * np.sin(i_n*k) * SIGMA_X - 2 * np.cos(i_n*k) * SIGMA_Z
                 Gn = Gn + two_lv_model.get_quantum_exect_val(Gzk, two_lv_state)
                 Gn_m = Gn_m + two_lv_model.get_quantum_exect_val(Gzk_m, two_lv_state)
-        
+            '''
             for j_n in range(n-i_n):
-                corr_mat[j_n,j_n+i_n]=Gn
-                if j_n+i_n+1 < n : corr_mat[j_n+i_n+1,j_n+i_n]=Gn_m
-        
+                corr_mat[j_n,j_n+i_n]=Gn /self.N
+                if j_n+i_n+1 < n : corr_mat[j_n+i_n+1,j_n+i_n]=Gn_m /self.N
+            '''
+            corr_row.append(Gn / self.N)
+            corr_col.append(Gn_m / self.N)
+        corr_col[0]=corr_row[0]
+        corr_col.pop(-1)
+        corr_mat=toeplitz(corr_col, corr_row)
         return det(corr_mat)
 
 
