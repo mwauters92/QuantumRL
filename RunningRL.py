@@ -17,6 +17,7 @@ parser.add_argument('--epochs', default=512, type=int, help="Number of epochs of
 parser.add_argument('--nstep', default=1024, type=int, help="Number of steps per epoch")
 parser.add_argument('--N', default=32, type=int, help="System size (only for pSpin and TFIM)")
 parser.add_argument('--ps', default=2, type=int, help="Interaction rank (only for pSpin)")
+parser.add_argument('--noise', default=0, type=float, help="Noise on the initial state")
 args = parser.parse_args()
 
 actType=args.actType                 # action type: bin, cont
@@ -33,22 +34,26 @@ layers=args.network
 # physical parameters
 N=[args.N]
 ps=args.ps                      # interaction rank of the pSpin model
+noise=args.noise
 
+if noise == 0 :
+  dirO = "../Output/"+model+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
+else :
+  dirO = "../Output/"+model+"N/ep"+str(epochs)+"_sep"+str(nstep)+"/"
 
-
-dirO = "../Output/"+model+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
 for Nt in P:
   dt = tau/Nt
   for Ns in N:
-    tf.reset_default_graph() 
+    #tf.reset_default_graph() 
+    tf.compat.v1.reset_default_graph()
     if model == 'SingleSpin':   
-      env_fn = lambda : qenv.SingleSpin(Nt,rtype,dt,actType)
+      env_fn = lambda : qenv.SingleSpin(Nt,rtype,dt,actType, noise=noise)
       dirOut=dirO+model+actType+"P"+str(Nt)+'_rw'+rtype
     elif model == 'pSpin':
-      env_fn = lambda : qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs)
+      env_fn = lambda : qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, noise=noise)
       dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     elif model == 'TFIM':
-      env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs)
+      env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, noise=noise)
       dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
       raise ValueError(f'Invalid model:{model}')
