@@ -430,7 +430,7 @@ class TFIM(QuantumEnviroment):
             k = self.k[i_k]
             Hx = -2 * SIGMA_Z
             Hz = 2 * np.sin(k) * SIGMA_X - 2 * np.cos(k) * SIGMA_Z
-            model = QuantumEnviroment(P, rtype, dt, acttype, g_target = g_target, noise=0, Hx = Hx, Hz = Hz)
+            model = QuantumEnviroment(P, rtype, dt, acttype, g_target = g_target, noise = noise, Hx = Hx, Hz = Hz)
             self.two_lv_models.append(model)
             self.Hx.append(Hx)
             self.Hz.append(Hz)
@@ -588,3 +588,126 @@ class TFIM(QuantumEnviroment):
         return det(corr_mat)
 
 
+class RandomIsing(QuantumEnviroment):
+    '''Child class of QuantumEnviroment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
+       Paramenters:
+           N (int): number of spin variables
+           measured_obs (str): 
+            "pesudospin-tomography" ->
+            "sx,sz*sz" -> local observables O_x = sigma_x, O_zz = sigma_z*sigma_z
+
+       
+       Methods:
+           get_full_state: returns the state of the whole ising model
+    '''
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="tomography",seed=856741):
+        # initilize model variables
+        self.N = N
+        self.state = None
+        self.m = 0
+        self.P = P
+        self.g_target=g_target
+        self.rtype = rtype
+        self.noise = noise
+        self.dt = dt
+        self.seed = seed
+        self.couplings = self.set_couplings(N,seed)
+        self.Hx = self.set_Hx(N)
+        self.Hz , self.Uz = self.set_Hz(N,self.couplings)
+        self.measured_obs = measured_obs
+        self.acttype=acttype
+        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = self.Hx, Hz = self.Hz)
+        self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
+        self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
+    
+
+    def set_couplings(self, N, seed):
+        if seed > 0 :
+            couplings = np.random.RandomState(seed=seed).random(N)
+        else :
+            couplings = np.random.RandomState(seed=None).random(N)
+        return couplings
+
+
+    def set_Hx(self,N):
+        """Transverse field S_x in the z basis representation.
+           Parameters:
+               N (int): chain length
+               job (int): 0 or 1 tells if to diagonalize Sx
+           Returns:
+               Sx (real): x component of the total spin
+               Ux (complex): if job=1 Ux contains the eigenvectors of Sx
+        """
+        Sx=np.zeros([2*N,2*N])
+        for j in range(N):
+            Sx[j,j] = 1.0
+            Sx[j+N,j+N] = -1.0
+        return Sx
+
+    def set_Hz(self,N,couplings,job=False):
+        """Transverse field S_x in the z basis representation.
+           Parameters:
+               N (int): chain length
+               job (int): 0 or 1 tells if to diagonalize Sx
+           Returns:
+               Sx (real): x component of the total spin
+               Ux (complex): if job=1 Ux contains the eigenvectors of Sx
+        """
+        Hz=np.zeros([2*N,2*N])
+        j = np.arange(N-1)
+        Hz[j,j+1] = couplings[j]
+        Hz[j+N,j+N+1] = -couplings[j]
+        Hz[j+N,j+1+N] = couplings[j]
+        Hz[j+N+1,j+N] = -couplings[j]
+        Hz[0,N] = - couplings[-1]
+        Hz[N,N+1] = - couplings[-1]
+        Hz[0,-1] =  couplings[-1]
+
+        Hz += Hz.T
+        Hz *= 0.5
+        if job:
+            _, Uz = np.linalgh.eigh(Hz)
+            return Hz, Uz
+        else:
+            return Hz
+
+    def get_observable(self, state, get_only_info=False):
+        if self.measured_obs == "tomography":
+            if get_only_info:
+                obs_shape = (4 *  self.N,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            state_real = np.real(state)
+            state_imag = np.imag(state)
+            obs = np.concatenate((state_real, state_imag))
+
+        elif self.measured_obs == "Hobs":
+            # get observable shape
+            if get_only_info:
+                obs_shape = (2,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            # get averages of Hx and Hz
+            avg_Hx = np.vdot(state,np.dot(self.Hx,state)) 
+            avg_Hz = np.vdot(state,np.dot(self.Hz,state)) 
+            obs = np.array([avg_Hx, avg_Hz])/self.N
+
+        elif self.measured_obs =='SzSz':
+            if get_only_info:
+                obs_shape = (self.N+1,)
+                obs_low = 0
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            j = np.arange(self.N-1)
+            obs[j] = self.coupligs[j]*(state[j+N]*state[j+N+1]+state[j+N]*state[j+1]
+                                     +state[j+N+1]*state[j]+state[j+1]*state[j])    
+
+            obs[N-1] = -self.coupligs[N]*(state[-1]*state[N+1]+state[-1]*state[0]
+                                     +state[N+1]*state[N]+state[N]*state[0])    
+            obs[-1] = np.vdot(state,np.dot(self.Hx,state)) 
+        else:
+            raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
+
+        return obs.reshape(-1)
