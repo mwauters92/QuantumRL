@@ -288,6 +288,7 @@ class pSpin(QuantumEnviroment):
         self.P=P
         self.measured_obs=measured_obs
         self.acttype=acttype
+        self.g_target = g_target
         QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = self.Hx, Hz = self.Hz)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
