@@ -1,6 +1,8 @@
 # QuantumRL
 classes and scripts for ground state preparation with reinforcement learning. It requires a running version of OpenAI spinningup libray. 
 Installation instruction can be find in https://spinningup.openai.com/en/latest/user/installation.html
+WARNING: the new version of spinningup requires both tensorflow and pytorch. Both are installed along with spinningup, but there can be issues with the tmp directory.
+An installation of mpi is needed, otherwise spinningup will not compile. 
 
 Files
 quantum_env.py 
