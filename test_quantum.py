@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 from gym import spaces
 import tensorflow as tf
 import quantum_env as qenv
-from spinup.utils.test_policy import load_policy, run_policy
+from spinup.utils.test_policy import load_tf_policy, run_policy, load_policy_and_env
 import argparse
+import time
 
 def rew2en(reward, rtype, N=2):
     if rtype == 'energy':
@@ -34,7 +35,9 @@ parser.add_argument('--nstep', default=1024, type=int, help="Number of steps per
 parser.add_argument('--nvalidation', default=20, type=int, help="Number of validation episodes")
 parser.add_argument('--N', default=32, type=int, help="System size (only for pSpin and TFIM)")
 parser.add_argument('--ps', default=2, type=int, help="Interaction rank (only for pSpin)")
+parser.add_argument('--hfield', default=0, type=float, help="Transverse field for target state")
 parser.add_argument('--plotP', default=False, type=bool, help="if True prints a file with the state value function of in the observation space")
+parser.add_argument('--noise', default=0, type=float, help="Noise on the initial state")
 args = parser.parse_args()
 
 actType=args.actType                 # action type: bin, cont
@@ -48,29 +51,42 @@ epochs=args.epochs                      # number of epochs
 nstep=args.nstep                      # steps per episodes
 layers=args.network
 deterministic_act=args.deterministic
+noise=args.noise
 
 if measured_obs == 'Hobs':
     plotSValue=args.plotP
 else:
     plotSValue=False
-
+print("value ", plotSValue)
 # physical parameters
 Ns=args.N
 ps=args.ps                      # interaction rank of the pSpin model
+hfield = args.hfield
 Na=args.nvalidation
 
-dirO = "../Output/"+model+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
+if noise == 0 :
+    if hfield > 0:
+        dirO = "../Output/"+model+"_g"+str(hfield)+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
+    else:
+        dirO = "../Output/"+model+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
+else :
+    if hfield > 0:
+        dirO = "../Output/"+model+"N_g"+str(hfield)+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
+    else:
+        dirO = "../Output/"+model+"N/ep"+str(epochs)+"_sep"+str(nstep)+"/"
+
+
 for Nt in P:
     tf.reset_default_graph()
     dt=tau/Nt
     if model == 'SingleSpin':
-        env = qenv.SingleSpin(Nt,rtype,dt,actType)
+        env = qenv.SingleSpin(Nt,rtype,dt,actType,noise=noise, g=hfield)
         dirOut=dirO+model+actType+"P"+str(Nt)+'_rw'+rtype
     elif model == 'pSpin':
-        env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs)
+        env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     elif model == 'TFIM':
-        env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs)
+        env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
         raise ValueError(f'Model not implemented:{model}')
@@ -78,8 +94,9 @@ for Nt in P:
     #dirOut += '/network'+str(layers[0])+'x'+str(layers[1])        
     dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
     print(deterministic_act, plotSValue) 
-    _, get_action, get_value = load_policy('./'+dirOut,deterministic=deterministic_act, valueFunction=plotSValue)
-
+    #_, get_action, get_value = load_tf_policy('./'+dirOut,deterministic=deterministic_act, valueFunction=plotSValue)
+    _, get_action = load_policy_and_env('./'+dirOut,deterministic=deterministic_act)
+    get_value = None
     if actType=='bin':
         head='# 1-episode,  2-action, 3-reward, 4-energy'
         data=np.zeros([Na*Nt,4])
@@ -102,16 +119,23 @@ for Nt in P:
         data=np.zeros([Na*Nt,5])
         dynamics=np.zeros([Na*Nt,1+env.obs_shape[0]])
         summary=np.zeros([Na+1,4])
+        #t_QA=0 #DBG
+        #t_RL=0 #DBG
         for ep in range(Na):
             o = env.reset()
             for i in range(Nt):
-                #a = np.clip(get_action(o),0,2*np.pi)
-                a = get_action(o)
+                a = np.clip(get_action(o),0,2*np.pi)
+                #t0 = time.time() #DBG
+                #a = get_action(o)
+                #t_RL += t0 - time.time() #DBG
+                #t0 = time.time()
                 o, r, d, _ = env.step(a)
+                #t_QA += t0 - time.time()
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r, rew2en(r,rtype,Ns)])
                 dynamics[ep*Nt+i,:]=np.concatenate(([ep],o))
 
             summary[ep,:]=np.array([ep,r,rew2en(r,rtype,Ns),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
+        #print('Time in QuantumEnv for {} episodes of {} steps: {}; Time in ReinforceL: {}'.format(Na, Nt, t_QA, t_RL) ) #DBG
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
