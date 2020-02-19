@@ -36,7 +36,7 @@ layers=args.network
 # physical parameters
 N=[args.N]
 ps=args.ps                      # interaction rank of the pSpin model
-hfield = args.sfield
+hfield = args.hfield
 noise=args.noise
 
 if noise == 0 :
@@ -56,13 +56,13 @@ for Nt in P:
     #tf.reset_default_graph() 
     tf.compat.v1.reset_default_graph()
     if model == 'SingleSpin':   
-      env_fn = lambda : qenv.SingleSpin(Nt,rtype,dt,actType, noise=noise, g=hfield)
+      env_fn = lambda : qenv.SingleSpin(Nt,rtype,dt,actType, noise=noise, g_target=hfield)
       dirOut=dirO+model+actType+"P"+str(Nt)+'_rw'+rtype
     elif model == 'pSpin':
-      env_fn = lambda : qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g=hfield, noise=noise)
+      env_fn = lambda : qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     elif model == 'TFIM':
-      env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g=hfield, noise=noise)
+      env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
       raise ValueError(f'Invalid model:{model}')
