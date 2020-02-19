@@ -80,13 +80,13 @@ for Nt in P:
     tf.reset_default_graph()
     dt=tau/Nt
     if model == 'SingleSpin':
-        env = qenv.SingleSpin(Nt,rtype,dt,actType,noise=noise, g=hfield)
+        env = qenv.SingleSpin(Nt,rtype,dt,actType,noise=noise, g_target=hfield)
         dirOut=dirO+model+actType+"P"+str(Nt)+'_rw'+rtype
     elif model == 'pSpin':
-        env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g=hfield ,noise=noise)
+        env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     elif model == 'TFIM':
-        env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g=hfield ,noise=noise)
+        env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
         raise ValueError(f'Model not implemented:{model}')
