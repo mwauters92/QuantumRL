@@ -50,7 +50,7 @@ class QuantumEnviroment():
         P (int): number of steps in one episode
         rtype (string): type of reward computed from the system energy E at the end of the episode 
             - energy: the reward is -E 
-            - expE: reward is exp(-2*E)
+            - expE: reward is exp(-4*E)
             - logE: reward is -log( 1 + E + 1.e-8) this can be used only if the minimum energy (rescaled) is known 
         dt (float32): evolution time at each step of an episode. It is used onyly if the action in binary
         acttype (string): set the type of actions that can be performed on the system
@@ -147,7 +147,8 @@ class QuantumEnviroment():
         return E
 
     def get_quantum_exect_val(self, Op, psi):
-        expect_val = np.real(np.dot(psi.T.conj(), np.dot(Op, psi)))
+        #expect_val = np.real(np.dot(psi.T.conj(), np.dot(Op, psi))).sum()
+        expect_val = np.real(np.vdot(psi, np.dot(Op, psi)))
         return expect_val
 
     def get_dense_Uevol(self, E, U, dt):
@@ -601,7 +602,7 @@ class RandomIsing(QuantumEnviroment):
        Methods:
            get_full_state: returns the state of the whole ising model
     '''
-    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="tomography",seed=856741):
+    def __init__(self, N, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="Hobs",seed=856741):
         # initilize model variables
         self.N = N
         self.state = None
@@ -614,17 +615,20 @@ class RandomIsing(QuantumEnviroment):
         self.seed = seed
         self.couplings = self.set_couplings(N,seed)
         self.Hx = self.set_Hx(N)
-        self.Hz , self.Uz = self.set_Hz(N,self.couplings)
+        self.Hz = self.set_Hz(N,self.couplings)
         self.measured_obs = measured_obs
         self.acttype=acttype
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = self.Hx, Hz = self.Hz)
+        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx, Hz = self.Hz)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
-    
+        self.Ex,self.Ux = np.linalg.eigh(self.Hx)
+        self.psi_start = self.Ux[:,:self.N]    
 
     def set_couplings(self, N, seed):
-        if seed > 0 :
+        if seed > 1 :
             couplings = np.random.RandomState(seed=seed).random(N)
+        elif seed == 1 :
+            couplings = np.ones(N)
         else :
             couplings = np.random.RandomState(seed=None).random(N)
         return couplings
@@ -641,11 +645,11 @@ class RandomIsing(QuantumEnviroment):
         """
         Sx=np.zeros([2*N,2*N])
         for j in range(N):
-            Sx[j,j] = 1.0
-            Sx[j+N,j+N] = -1.0
-        return Sx
+            Sx[j,j] = -1.0
+            Sx[j+N,j+N] = 1.0
+        return -Sx
 
-    def set_Hz(self,N,couplings,job=False):
+    def set_Hz(self,N,couplings):
         """Transverse field S_x in the z basis representation.
            Parameters:
                N (int): chain length
@@ -656,7 +660,7 @@ class RandomIsing(QuantumEnviroment):
         """
         Hz=np.zeros([2*N,2*N])
         j = np.arange(N-1)
-        Hz[j,j+1] = couplings[j]
+        """Hz[j,j+1] = couplings[j]
         Hz[j+N,j+N+1] = -couplings[j]
         Hz[j+N,j+1+N] = couplings[j]
         Hz[j+N+1,j+N] = -couplings[j]
@@ -664,23 +668,33 @@ class RandomIsing(QuantumEnviroment):
         Hz[N,N+1] = - couplings[-1]
         Hz[0,-1] =  couplings[-1]
 
-        Hz += Hz.T
+        Hz += Hz.T"""
+        A= np.zeros([N,N])
+        B= np.zeros([N,N])
+        j = np.arange(N-1)
+        A[j,j+1] = -couplings[j]
+        B[j,j+1] = couplings[j]
+        A[-1,0] =  couplings[-1]
+        B[-1,0] = - couplings[-1]
+        A+=A.T
+        B+=-B.T
+        Hz[:N,:N] = A
+        Hz[N:,N:] = -A
+        Hz[:N,N:] = B
+        Hz[N:,:N] = -B
+        return 0.5*Hz
         Hz *= 0.5
-        if job:
-            _, Uz = np.linalgh.eigh(Hz)
-            return Hz, Uz
-        else:
-            return Hz
+        return Hz
 
     def get_observable(self, state, get_only_info=False):
         if self.measured_obs == "tomography":
             if get_only_info:
-                obs_shape = (4 *  self.N,)
+                obs_shape = (2 *  self.N,)
                 obs_low = -1
                 obs_high = 1
                 return obs_shape, obs_low, obs_high
-            state_real = np.real(state)
-            state_imag = np.imag(state)
+            state_real = np.real(state[:self.N])
+            state_imag = np.imag(state[:self.N])
             obs = np.concatenate((state_real, state_imag))
 
         elif self.measured_obs == "Hobs":
@@ -691,8 +705,9 @@ class RandomIsing(QuantumEnviroment):
                 obs_high = 1
                 return obs_shape, obs_low, obs_high
             # get averages of Hx and Hz
-            avg_Hx = np.vdot(state,np.dot(self.Hx,state)) 
-            avg_Hz = np.vdot(state,np.dot(self.Hz,state)) 
+            avg_Hx = np.vdot(state,np.dot(self.Hx,state)).sum() 
+            avg_Hx = self.get_quantum_exect_val(self.Hx,state).sum()
+            avg_Hz = np.vdot(state,np.dot(self.Hz,state)).sum() 
             obs = np.array([avg_Hx, avg_Hz])/self.N
 
         elif self.measured_obs =='SzSz':
@@ -701,14 +716,25 @@ class RandomIsing(QuantumEnviroment):
                 obs_low = 0
                 obs_high = 1
                 return obs_shape, obs_low, obs_high
-            j = np.arange(self.N-1)
-            obs[j] = self.coupligs[j]*(state[j+N]*state[j+N+1]+state[j+N]*state[j+1]
-                                     +state[j+N+1]*state[j]+state[j+1]*state[j])    
+            #j = np.arange(self.N-1)
+            N = self.N
+            obs = np.zeros(N+1,)
+            cv = state[:N,:]
+            cdv = state[N:,:]
+            #obs[j] = self.couplings[j]*np.sum(state[j+N,:]*state[j+N+1,:]+state[j+N,:]*state[j+1,:]
+            #                         +state[j+N+1,:]*state[j,:]+state[j+1,:]*state[j,:])    
+            for j in range(N-1):
+                obs[j] = self.couplings[j]*(np.dot(cdv[j,:]+cv[j,:],cdv[j+1,:]+cv[j+1,:]))
 
-            obs[N-1] = -self.coupligs[N]*(state[-1]*state[N+1]+state[-1]*state[0]
-                                     +state[N+1]*state[N]+state[N]*state[0])    
-            obs[-1] = np.vdot(state,np.dot(self.Hx,state)) 
+            obs[N-1] = -self.couplings[-1]*(np.dot(cdv[-1,:],cdv[0,:]+cv[0,:])+
+                                            np.dot(cdv[0,:]+cv[0,:],cv[-1,:]))    
+            #obs[-1] = np.vdot(state,np.dot(self.Hx,state)).sum()/N
+            obs[-1] = self.get_quantum_exect_val(self.Hx,state)/N
         else:
             raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
 
         return obs.reshape(-1)
+
+    def get_observable_info(self):
+        return self.get_observable(None, get_only_info=True)
+
