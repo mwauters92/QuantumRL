@@ -64,6 +64,9 @@ for Nt in P:
     elif model == 'TFIM':
       env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
+    elif model == 'RandomIsing':
+      env_fn = lambda : qenv.RandomIsing(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise, seed=1)
+      dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
       raise ValueError(f'Invalid model:{model}')
     dirOut += '/'+measured_obs+'/network'+str(layers[0])+'x'+str(layers[1])
