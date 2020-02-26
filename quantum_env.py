@@ -143,12 +143,11 @@ class QuantumEnviroment():
 
     def get_avg_H_target(self, psi):
         H = self.H_target
-        E = np.real(np.dot(psi.T.conj(), np.dot(H, psi)))
+        E = np.real(np.dot(psi.T.conj(), np.dot(H, psi))).sum()
         return E
 
     def get_quantum_exect_val(self, Op, psi):
-        #expect_val = np.real(np.dot(psi.T.conj(), np.dot(Op, psi))).sum()
-        expect_val = np.real(np.vdot(psi, np.dot(Op, psi)))
+        expect_val = np.real(np.dot(psi.T.conj(), np.dot(Op, psi)))
         return expect_val
 
     def get_dense_Uevol(self, E, U, dt):
@@ -591,12 +590,13 @@ class TFIM(QuantumEnviroment):
 
 
 class RandomIsing(QuantumEnviroment):
-    '''Child class of QuantumEnviroment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
-       Paramenters:
+    '''Child class of QuantumEnviroment. Add specific model (random Couplings Ising Model or RandomIsing) to the class. We use Jordan-Wigner transormation to map the RandomIsing model to free fermions.
+       Parameters:
            N (int): number of spin variables
+           seed (int): sets the seed for the random couplings. if seed=0 the seed is taken from clock           time, if seed=1 couplings are uniform, otherwise seed=seed
            measured_obs (str): 
-            "pesudospin-tomography" ->
-            "sx,sz*sz" -> local observables O_x = sigma_x, O_zz = sigma_z*sigma_z
+            "Hobs" -> average transverse magnetization and interactione energy
+            "SzSz" -> local observables <s^z_j s^z_{j+1}> 
 
        
        Methods:
@@ -633,6 +633,19 @@ class RandomIsing(QuantumEnviroment):
             couplings = np.random.RandomState(seed=None).random(N)
         return couplings
 
+    def reset(self):
+        '''
+        Reset the state to the initial one, with the possible addition of disorder, set by self.noise
+        Returns: 
+            obs (real): observable of reset state
+        '''
+        # initialize a new simulation:
+        # I will call it after receiving a flag "done"
+        self.m = 0
+        self.state = np.copy(self.psi_start)+self.noise*np.random.random(self.psi_start.shape)
+        self.state /= np.sqrt(np.diag(np.dot(self.state.T.conj(),self.state)))
+        obs = self.get_observable(self.state)
+        return obs #not inter. Now gives back reward = 0
 
     def set_Hx(self,N):
         """Transverse field S_x in the z basis representation.
@@ -660,15 +673,6 @@ class RandomIsing(QuantumEnviroment):
         """
         Hz=np.zeros([2*N,2*N])
         j = np.arange(N-1)
-        """Hz[j,j+1] = couplings[j]
-        Hz[j+N,j+N+1] = -couplings[j]
-        Hz[j+N,j+1+N] = couplings[j]
-        Hz[j+N+1,j+N] = -couplings[j]
-        Hz[0,N] = - couplings[-1]
-        Hz[N,N+1] = - couplings[-1]
-        Hz[0,-1] =  couplings[-1]
-
-        Hz += Hz.T"""
         A= np.zeros([N,N])
         B= np.zeros([N,N])
         j = np.arange(N-1)
@@ -705,9 +709,8 @@ class RandomIsing(QuantumEnviroment):
                 obs_high = 1
                 return obs_shape, obs_low, obs_high
             # get averages of Hx and Hz
-            avg_Hx = np.vdot(state,np.dot(self.Hx,state)).sum() 
             avg_Hx = self.get_quantum_exect_val(self.Hx,state).sum()
-            avg_Hz = np.vdot(state,np.dot(self.Hz,state)).sum() 
+            avg_Hz = self.get_quantum_exect_val(self.Hz,state).sum()
             obs = np.array([avg_Hx, avg_Hz])/self.N
 
         elif self.measured_obs =='SzSz':
@@ -720,7 +723,8 @@ class RandomIsing(QuantumEnviroment):
             N = self.N
             obs = np.zeros(N+1,)
             cv = state[:N,:]
-            cdv = state[N:,:]
+            cdv = state[:N,:]
+            #cdv = state[N:,:]
             #obs[j] = self.couplings[j]*np.sum(state[j+N,:]*state[j+N+1,:]+state[j+N,:]*state[j+1,:]
             #                         +state[j+N+1,:]*state[j,:]+state[j+1,:]*state[j,:])    
             for j in range(N-1):
