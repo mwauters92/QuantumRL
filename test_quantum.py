@@ -64,6 +64,16 @@ ps=args.ps                      # interaction rank of the pSpin model
 hfield = args.hfield
 Na=args.nvalidation
 
+def set_couplings( N, seed):
+    if seed > 1 :
+        couplings = np.random.RandomState(seed=seed).random(N)
+    elif seed == 1 :
+        couplings = np.ones(N)
+    else :
+        couplings = np.random.RandomState(seed=None).random(N)
+    return couplings
+
+
 if noise == 0 :
     if hfield > 0:
         dirO = "../Output/"+model+"_g"+str(hfield)+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
@@ -82,15 +92,20 @@ for Nt in P:
     if model == 'SingleSpin':
         env = qenv.SingleSpin(Nt,rtype,dt,actType,noise=noise, g_target=hfield)
         dirOut=dirO+model+actType+"P"+str(Nt)+'_rw'+rtype
+        gs_energy = -1
     elif model == 'pSpin':
         env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
+        gs_energy = -Ns
     elif model == 'TFIM':
         env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
-    elif model == 'RandomIsing':
-        env = qenv.RandomIsing(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
+        gs_energy = -Ns
+    elif model == 'RandomTFIM':
+        J_couplings = set_couplings(Ns, 812453)
+        env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
+        gs_energy = -J_coupling.sum()
     else:
         raise ValueError(f'Model not implemented:{model}')
     
@@ -137,7 +152,7 @@ for Nt in P:
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r, rew2en(r,rtype,Ns)])
                 dynamics[ep*Nt+i,:]=np.concatenate(([ep],o))
 
-            summary[ep,:]=np.array([ep,r,rew2en(r,rtype,Ns),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
+            summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
         #print('Time in QuantumEnv for {} episodes of {} steps: {}; Time in ReinforceL: {}'.format(Na, Nt, t_QA, t_RL) ) #DBG
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
