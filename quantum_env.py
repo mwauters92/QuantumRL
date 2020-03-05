@@ -733,7 +733,7 @@ class RandomTFIM(QuantumEnviroment):
                 obs_high = 1
                 return obs_shape, obs_low, obs_high
             # get averages of Hx and Hz
-            avg_Hx = self.get_avg_Ham(self.Hx_tilde, state)
+            avg_Hx = -self.get_avg_Ham(self.Hx_tilde, state)
             avg_Hz = self.get_avg_Ham(self.Hz_tilde, state)
             obs = np.array([avg_Hx, avg_Hz])/self.N
 
