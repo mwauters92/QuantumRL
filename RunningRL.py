@@ -39,6 +39,17 @@ ps=args.ps                      # interaction rank of the pSpin model
 hfield = args.hfield
 noise=args.noise
 
+
+def set_couplings( N, seed):
+    if seed > 1 :
+        couplings = np.random.RandomState(seed=seed).random(N)
+    elif seed == 1 :
+        couplings = np.ones(N)
+    else :
+        couplings = np.random.RandomState(seed=None).random(N)
+    return couplings
+
+
 if noise == 0 :
   if hfield > 0:
     dirO = "../Output/"+model+"_g"+str(hfield)+"/ep"+str(epochs)+"_sep"+str(nstep)+"/"
@@ -64,8 +75,9 @@ for Nt in P:
     elif model == 'TFIM':
       env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
-    elif model == 'RandomIsing':
-      env_fn = lambda : qenv.RandomIsing(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise, seed=1)
+    elif model == 'RandomTFIM':
+      J_couplings = set_couplings(Ns, 812453)
+      env_fn = lambda : qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
       raise ValueError(f'Invalid model:{model}')
