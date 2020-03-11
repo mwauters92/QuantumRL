@@ -105,7 +105,7 @@ for Nt in P:
         J_couplings = set_couplings(Ns, 812453)
         env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
-        gs_energy = -J_coupling.sum()
+        gs_energy = -J_couplings.sum()
     else:
         raise ValueError(f'Model not implemented:{model}')
     
