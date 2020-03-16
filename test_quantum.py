@@ -38,31 +38,32 @@ parser.add_argument('--ps', default=2, type=int, help="Interaction rank (only fo
 parser.add_argument('--hfield', default=0, type=float, help="Transverse field for target state")
 parser.add_argument('--plotP', default=False, type=bool, help="if True prints a file with the state value function of in the observation space")
 parser.add_argument('--noise', default=0, type=float, help="Noise on the initial state")
+parser.add_argument('--seed', default = 812453, type=int, help="Seed for the RandomTFIM model")
 args = parser.parse_args()
 
-actType=args.actType                 # action type: bin, cont
-model=args.model                   # model : pSpin, SingleSpin, TFIM
-tau=args.tau                          # total time used in the binary action process
-P=np.arange(args.Pvars[0],args.Pvars[1],args.Pvars[2])             # list of episode lenghts 
-#P=[8]
+actType = args.actType                 # action type: bin, cont
+model = args.model                   # model : pSpin, SingleSpin, TFIM
+tau = args.tau                          # total time used in the binary action process
+P = np.arange(args.Pvars[0],args.Pvars[1],args.Pvars[2])             # list of episode lenghts 
 measured_obs = args.obs
-rtype =args.rtype                 #reward types: energy, logE, expE
-epochs=args.epochs                      # number of epochs
-nstep=args.nstep                      # steps per episodes
-layers=args.network
-deterministic_act=args.deterministic
-noise=args.noise
+rtype = args.rtype                 #reward types: energy, logE, expE
+epochs = args.epochs                      # number of epochs
+nstep = args.nstep                      # steps per episodes
+layers = args.network
+deterministic_act = args.deterministic
+noise = args.noise
+seed = args.seed
 
 if measured_obs == 'Hobs':
-    plotSValue=args.plotP
+    plotSValue = args.plotP
 else:
-    plotSValue=False
+    plotSValue = False
 print("value ", plotSValue)
 # physical parameters
-Ns=args.N
-ps=args.ps                      # interaction rank of the pSpin model
+Ns = args.N
+ps = args.ps                      # interaction rank of the pSpin model
 hfield = args.hfield
-Na=args.nvalidation
+Na = args.nvalidation
 
 def set_couplings( N, seed):
     if seed > 1 :
@@ -102,7 +103,7 @@ for Nt in P:
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
     elif model == 'RandomTFIM':
-        J_couplings = set_couplings(Ns, 812453)
+        J_couplings = set_couplings(Ns, seed)
         env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -J_couplings.sum()
@@ -140,6 +141,10 @@ for Nt in P:
         #t_QA=0 #DBG
         #t_RL=0 #DBG
         for ep in range(Na):
+            """if model == 'RandomTFIM' and ep > 0:
+                J_couplings = set_couplings(Ns, 0)
+                env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
+                gs_energy = -J_couplings.sum()"""
             o = env.reset()
             for i in range(Nt):
                 a = np.clip(get_action(o),0,2*np.pi)
@@ -166,8 +171,9 @@ for Nt in P:
             for ozz in np.linspace(-1,1,100):
                 for ox in np. linspace(0,1,100):
                     o=np.array([ox,ozz])
-                    a = np.clip(get_action(o), 0, np.pi*2)
-                    value.append(np.array([ox,ozz,get_value(o),a[0], a[1]]))
-            np.savetxt(dirOut+"/valueFunction.dat",value, header=head,fmt='%.6e  %.6e  %.6e  %.6e  %.6e'  ) 
+                    #a = np.clip(get_action(o), 0, np.pi*2)
+                    a = get_action(o)
+                    value.append(np.array([ox,ozz,a[0], a[1]]))
+            np.savetxt(dirOut+"/valueFunction.dat",value, header=head,fmt='%.6e  %.6e  %.6e  %.6e'  ) 
             
 
