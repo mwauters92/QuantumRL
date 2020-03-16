@@ -20,6 +20,7 @@ parser.add_argument('--N', default=32, type=int, help="System size (only for pSp
 parser.add_argument('--ps', default=2, type=int, help="Interaction rank (only for pSpin)")
 parser.add_argument('--hfield', default=0, type=float, help="Transverse field for target state")
 parser.add_argument('--noise', default=0, type=float, help="Noise on the initial state")
+parser.add_argument('--seed', default = 812453, type=int, help="Seed for the RandomTFIM model")
 args = parser.parse_args()
 
 actType=args.actType                 # action type: bin, cont
@@ -38,7 +39,7 @@ N=[args.N]
 ps=args.ps                      # interaction rank of the pSpin model
 hfield = args.hfield
 noise=args.noise
-
+seed = args.seed
 
 def set_couplings( N, seed):
     if seed > 1 :
@@ -76,7 +77,7 @@ for Nt in P:
       env_fn = lambda : qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     elif model == 'RandomTFIM':
-      J_couplings = set_couplings(Ns, 812453)
+      J_couplings = set_couplings(Ns, seed)
       env_fn = lambda : qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield, noise=noise)
       dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
     else:
