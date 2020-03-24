@@ -734,12 +734,12 @@ class RandomTFIM(QuantumEnviroment):
                 return obs_shape, obs_low, obs_high
             # get averages of Hx and Hz
             avg_Hx = -self.get_avg_Ham(self.Hx_tilde, state)
-            avg_Hz = self.get_avg_Ham(self.Hz_tilde, state)
+            avg_Hz = self.get_avg_Ham(self.Hz_tilde, state) #/(self.J_couplings.mean())
             obs = np.array([avg_Hx, avg_Hz])/self.N
 
         elif self.measured_obs =='szsz,sx':
             if get_only_info:
-                obs_shape = (self.N+1,)
+                obs_shape = (2*self.N,)
                 obs_low = 0
                 obs_high = 1
                 return obs_shape, obs_low, obs_high
@@ -758,7 +758,7 @@ class RandomTFIM(QuantumEnviroment):
             #                                 np.dot(cdv[0,:]+cv[0,:],cv[-1,:]))    
             # #obs[-1] = np.vdot(state,np.dot(self.Hx,state)).sum()/N
             # obs[-1] = self.get_quantum_expect_val(self.Hx,state)/N
-            C = state.reshape((2 * self.N, 2 * self.N))
+            Correl = state.reshape((2 * self.N, 2 * self.N))
 
             # get sx (check notes for equations)
             avg_sx = np.zeros(self.N)
@@ -771,11 +771,11 @@ class RandomTFIM(QuantumEnviroment):
                 if (i + 1) < self.N:
                     avg_szsz[i] = (Correl[i + self.N, i + 1] + Correl[i + self.N, i + 1 + self.N] - Correl[i, i + 1] - Correl[i, i + 1 + self.N])
                 else:
-                    avg_szsz[i] = (-1) * (Correl[i + self.N, 1] + Correl[i + self.N, 1 + self.N] - Correl[n, 1] - Correl[i, 1 + self.N])
+                    avg_szsz[i] = (-1) * (Correl[i + self.N, 1] + Correl[i + self.N, 1 + self.N] - Correl[self.N, 1] - Correl[i, 1 + self.N])
 
             obs_sx = np.real(avg_sx)
-            obs_sz = np.real(obs_zz)
-            obs = np.concatenate([obs_x, obs_zz])
+            obs_sz = np.real(avg_szsz)
+            obs = np.concatenate([obs_sx, obs_sz])
 
         else:
             raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
