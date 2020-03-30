@@ -8,6 +8,7 @@ import tensorflow as tf
 import quantum_env as qenv
 from spinup.utils.test_policy import load_tf_policy, run_policy, load_policy_and_env
 import argparse
+from scipy.optimize import minimize
 import time
 
 def rew2en(reward, rtype, N=2):
@@ -87,6 +88,13 @@ else :
         dirO = "../Output/"+model+"N/ep"+str(epochs)+"_sep"+str(nstep)+"/"
 
 
+def evo_QAOA(x):
+    o=env.reset()
+    for j in range(int(x.size/2)):
+        a = [x[j], x[j+int(x.size/2)]]
+        o, r, d, _ = env.step(a)
+    return  rew2en(r, rtype, Ns)
+
 for Nt in P:
     tf.reset_default_graph()
     dt=tau/Nt
@@ -98,6 +106,7 @@ for Nt in P:
         env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
+        f_grad = lambda x : env.get_fullEvo(x, grad=True)
     elif model == 'TFIM':
         env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
@@ -136,8 +145,10 @@ for Nt in P:
     elif actType=='cont':
         head='# 1-episode,  2-action-gamma, 3-action-beta, 4-reward, 5-energy'
         data=np.zeros([Na*Nt,5])
+        data_opt=np.zeros([Na*Nt,2])
         dynamics=np.zeros([Na*Nt,1+env.obs_shape[0]])
-        summary=np.zeros([Na+1,4])
+        summary=np.zeros([Na+1,5])
+
         #t_QA=0 #DBG
         #t_RL=0 #DBG
         for ep in range(Na):
@@ -146,24 +157,30 @@ for Nt in P:
                 env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
                 gs_energy = -J_couplings.sum()"""
             o = env.reset()
+            x_guess = np.zeros(2*Nt)
+            x_o = np.zeros([Nt,2])
             for i in range(Nt):
                 a = np.clip(get_action(o),0,2*np.pi)
-                #t0 = time.time() #DBG
-                #a = get_action(o)
-                #t_RL += t0 - time.time() #DBG
-                #t0 = time.time()
+                x_guess[i]=a[0]
+                x_guess[i+Nt]=a[1]
                 o, r, d, _ = env.step(a)
                 #t_QA += t0 - time.time()
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r, rew2en(r,rtype,Ns)])
                 dynamics[ep*Nt+i,:]=np.concatenate(([ep],o))
-
-            summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
+            
+            res = minimize(env.get_fullEvo, x_guess, method="BFGS", jac=f_grad, tol=1e-5, options={'disp': True, 'maxiter': 1e5, 'gtol': 1e-5})
+            print("f_in = {-r}, f_opt = {res.fun}")
+            print("grad = {np.dot(f_grad(res.x), f_grad(res.x))}")
+            data_opt[ep*Nt:(ep+1)*Nt,0] = res.x[:Nt]
+            data_opt[ep*Nt:(ep+1)*Nt,1] = res.x[Nt:]
+            summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
         #print('Time in QuantumEnv for {} episodes of {} steps: {}; Time in ReinforceL: {}'.format(Na, Nt, t_QA, t_RL) ) #DBG
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
+        np.savetxt(dirOut+"/actions_opt.dat",data_opt, header=head,fmt='%.6e  %.6e') 
         head='# 1-episode,  2-reward 3-energy, 4-time'
-        np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%.6e  %.6e  %.6e  %.6e'  ) 
+        np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%.6e  %.6e  %.6e  %.6e  %.6e'  ) 
         head='# 1-episode,  2-s_x, 3-szsz, 4- corr 2'
         np.savetxt(dirOut+"/dynamics.dat",dynamics, header=head  ) 
         if plotSValue:
