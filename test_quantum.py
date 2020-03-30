@@ -40,6 +40,7 @@ parser.add_argument('--hfield', default=0, type=float, help="Transverse field fo
 parser.add_argument('--plotP', default=False, type=bool, help="if True prints a file with the state value function of in the observation space")
 parser.add_argument('--noise', default=0, type=float, help="Noise on the initial state")
 parser.add_argument('--seed', default = 812453, type=int, help="Seed for the RandomTFIM model")
+parser.add_argument('--local_opt', default = False, type=bool, help="perform local optimization after RL test")
 args = parser.parse_args()
 
 actType = args.actType                 # action type: bin, cont
@@ -54,6 +55,7 @@ layers = args.network
 deterministic_act = args.deterministic
 noise = args.noise
 seed = args.seed
+local_opt = args.local_opt
 
 if measured_obs == 'Hobs':
     plotSValue = args.plotP
@@ -88,12 +90,6 @@ else :
         dirO = "../Output/"+model+"N/ep"+str(epochs)+"_sep"+str(nstep)+"/"
 
 
-def evo_QAOA(x):
-    o=env.reset()
-    for j in range(int(x.size/2)):
-        a = [x[j], x[j+int(x.size/2)]]
-        o, r, d, _ = env.step(a)
-    return  rew2en(r, rtype, Ns)
 
 for Nt in P:
     tf.reset_default_graph()
@@ -106,7 +102,7 @@ for Nt in P:
         env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
-        f_grad = lambda x : env.get_fullEvo(x, grad=True)
+        if local_opt: f_grad = lambda x : env.get_fullEvo(x, grad=True)
     elif model == 'TFIM':
         env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
@@ -168,12 +164,13 @@ for Nt in P:
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r, rew2en(r,rtype,Ns)])
                 dynamics[ep*Nt+i,:]=np.concatenate(([ep],o))
             
-            res = minimize(env.get_fullEvo, x_guess, method="BFGS", jac=f_grad, tol=1e-5, options={'disp': True, 'maxiter': 1e5, 'gtol': 1e-5})
-            print("f_in = {-r}, f_opt = {res.fun}")
-            print("grad = {np.dot(f_grad(res.x), f_grad(res.x))}")
-            data_opt[ep*Nt:(ep+1)*Nt,0] = res.x[:Nt]
-            data_opt[ep*Nt:(ep+1)*Nt,1] = res.x[Nt:]
-            summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
+            if local_opt:
+                res = minimize(env.get_fullEvo, x_guess, method="BFGS", jac=f_grad, tol=1e-5, options={'disp': True, 'maxiter': 1e5, 'gtol': 1e-5})
+                data_opt[ep*Nt:(ep+1)*Nt,0] = res.x[:Nt]
+                data_opt[ep*Nt:(ep+1)*Nt,1] = res.x[Nt:]
+                summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
+            else:
+                summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
         #print('Time in QuantumEnv for {} episodes of {} steps: {}; Time in ReinforceL: {}'.format(Na, Nt, t_QA, t_RL) ) #DBG
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
