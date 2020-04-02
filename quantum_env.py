@@ -646,6 +646,17 @@ class TFIM(QuantumEnviroment):
         corr_mat=toeplitz(corr_col, corr_row)
         return det(corr_mat)
 
+    def get_fullEvo(self,x,grad=False):
+        energy_tot = 0.
+        gradient_tot = 0.
+        if grad:
+            for model in self.two_lv_models:
+                gradient_tot += model.get_fullEvo(x,grad)
+            return gradient_tot
+        else:
+            for model in self.two_lv_models:
+                energy_tot += model.get_fullEvo(x,grad)
+            return energy_tot
 
 class RandomTFIM(QuantumEnviroment):
     '''Child class of QuantumEnviroment. Add specific model (random Couplings Ising Model or RandomIsing) to the class. We use Jordan-Wigner transormation to map the RandomIsing model to free fermions.
