@@ -102,12 +102,10 @@ for Nt in P:
         env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
-        #if local_opt: f_grad = lambda x : env.get_fullEvo(x, grad=True)
     elif model == 'TFIM':
         env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
-        #f_grad=False
     elif model == 'RandomTFIM':
         J_couplings = set_couplings(Ns, seed)
         env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
@@ -172,11 +170,11 @@ for Nt in P:
                 data_opt[ep*Nt:(ep+1)*Nt,0] = res.x[:Nt]
                 data_opt[ep*Nt:(ep+1)*Nt,1] = res.x[Nt:]
                 summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
-                result_locOpt.append([res.fun, res.x.sum(), res.niter, res.feval])
+                result_locOpt.append([res.fun, res.x.sum(), res.nit, res.nfev])
             else:
                 summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
         
-        if local_opt: result_locOpt.append(np.array(result_locOpt).mean(axix=0))
+        if local_opt: result_locOpt.append(np.array(result_locOpt).mean(axis=0))
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
 
