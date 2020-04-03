@@ -142,11 +142,11 @@ for Nt in P:
         np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%03d  %.6e  %.6e') 
 
     elif actType=='cont':
-        head='# 1-episode,  2-action-gamma, 3-action-beta, 4-reward, 5-energy'
         data=np.zeros([Na*Nt,5])
         data_opt=np.zeros([Na*Nt,2])
         dynamics=np.zeros([Na*Nt,1+env.obs_shape[0]])
         summary=np.zeros([Na+1,5])
+        result_locOpt=[]
 
         #t_QA=0 #DBG
         #t_RL=0 #DBG
@@ -172,17 +172,33 @@ for Nt in P:
                 data_opt[ep*Nt:(ep+1)*Nt,0] = res.x[:Nt]
                 data_opt[ep*Nt:(ep+1)*Nt,1] = res.x[Nt:]
                 summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
+                result_locOpt.append([res.fun, res.x.sum(), res.niter, res.feval])
             else:
                 summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
-
+        
+        if local_opt: result_locOpt.append(np.array(result_locOpt).mean(axix=0))
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
+
+        head='# 1-episode,  2-action-gamma, 3-action-beta, 4-reward, 5-energy'
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
+        
+        if local_opt:
+            head='# 1-action-gamma, 2-action-beta'
+            np.savetxt(dirOut+"/actions_opt.dat",data_opt, header=head,fmt='%.6e  %.6e') 
+
+            head='# 1-min_fun, 2-evo time, 3-Niter, 4-fun eval'
+            np.savetxt(dirOut+"/local_opt.dat",result_locOpt, header=head,fmt='%.6e  %.6e  %.6e  %.6e') 
+
+        head='# 1-action-gamma, 2-action-beta'
         np.savetxt(dirOut+"/actions_opt.dat",data_opt, header=head,fmt='%.6e  %.6e') 
-        head='# 1-episode,  2-reward 3-energy, 4-time'
+
+        head='# 1-episode, 2-reward, 3-res energy, 4-evo time, 5-loc opt'
         np.savetxt(dirOut+"/summary.dat",summary, header=head,fmt='%.6e  %.6e  %.6e  %.6e  %.6e'  ) 
+
         head='# 1-episode,  2-s_x, 3-szsz, 4- corr 2'
         np.savetxt(dirOut+"/dynamics.dat",dynamics, header=head  ) 
+
         if plotSValue:
             value = []
             for ozz in np.linspace(-1,1,100):
