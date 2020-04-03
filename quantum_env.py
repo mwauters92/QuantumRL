@@ -859,3 +859,61 @@ class RandomTFIM(QuantumEnviroment):
     def get_observable_info(self):
         return self.get_observable(None, get_only_info=True)
 
+    def get_fullEvo(self,x,grad=False):
+        """Evolution via Trotter step with given vectors Beta_ and Gamma_.
+        On the output it gives the Evolved state after Trotter step.
+        """
+
+        Nt=int(x.size/2)
+        gamma_=x[:Nt];
+        beta_=x[Nt:];
+
+        #psi_t=np.zeros([self.state.size,beta_.size+1],dtype="complex")
+        psi_t=[]
+        psi_t.append(np.copy(self.psi_start));
+        o = self.reset()
+
+        for m in range(beta_.size):
+            U = self.get_dense_Uevol(self.E1, self.U1, gamma_[m])
+            self.state = self.apply_U(U, self.state)
+            U = self.get_dense_Uevol(self.E2, self.U2, beta_[m])
+            self.state = self.apply_U(U, self.state)
+            psi_t.append(self.state.reshape(U.shape))
+
+        if grad :
+            #cpsi_t=np.zeros([self.state.size,beta_.size+1],dtype="complex");
+            cpsi_t=[];
+            cpsi_t.append(self.Hz_tilde)
+            o_shape = self.state.shape
+            self.state = np.copy(cpsi_t[0].reshape(o_shape))
+            for m in range(beta_.size):
+                U = self.get_dense_Uevol(self.E2, self.U2, -beta_[-m-1])
+                self.state = self.apply_U(U, self.state)
+                U = self.get_dense_Uevol(self.E1, self.U1, -gamma_[-m-1])
+                self.state = self.apply_U(U, self.state)
+                cpsi_t.append(self.state.reshape(U.shape))
+
+            Grad_g = np.zeros(gamma_.size,dtype="float")
+            Grad_b = np.zeros(beta_.size,dtype="float")
+            Grad_g = self.Grad_z(psi_t,cpsi_t,gamma_);
+            Grad_b = self.Grad_x(psi_t,cpsi_t,beta_);
+            return np.concatenate((Grad_g, Grad_b),axis=0)
+        else:
+            return self.get_avg_Ham(self.Hz_tilde,self.state) 
+
+    def Grad_x(self,Psi_t,CPsi_t,beta_):
+        """Compute the derivatives with respect to the parameters beta"""
+        Grad_b=np.zeros(beta_.size,dtype="complex");
+        M=beta_.size
+        for k in range(M):
+            Grad_b[k]=np.dot(CPsi_t[M-k-1],np.dot(self.H2,Psi_t[k+1])).trace()
+        return 2*Grad_b.imag
+
+    def Grad_z(self,Psi_t,CPsi_t,gamma_):
+        """Compute derivatives with respect to parameterrs Beta"""
+        Grad_g=np.zeros(gamma_.size,dtype="complex256");
+        M=gamma_.size
+        for k in range(M):
+            Grad_g[k]=np.dot(CPsi_t[M-k],np.dot(self.H1,Psi_t[k])).trace()
+        return 2*Grad_g.imag
+
