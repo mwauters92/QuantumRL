@@ -1,13 +1,15 @@
 import numpy as np
-import math
+#import math
 import sys
-from  scipy.linalg import eigh
-import matplotlib.pyplot as plt
+#from  scipy.linalg import eigh
+#import matplotlib.pyplot as plt
 from gym import spaces
-import tensorflow as tf
+#import tensorflow as tf
+from tensorflow import reset_default_graph
 import quantum_env as qenv
 from spinup.utils.test_policy import load_tf_policy, run_policy, load_policy_and_env
 import argparse
+from scipy.optimize import minimize
 import time
 
 def rew2en(reward, rtype, N=2):
@@ -40,6 +42,8 @@ parser.add_argument('--hfield', default=0, type=float, help="Transverse field fo
 parser.add_argument('--plotP', default=False, type=bool, help="if True prints a file with the state value function of in the observation space")
 parser.add_argument('--noise', default=0, type=float, help="Noise on the initial state")
 parser.add_argument('--seed', default = 812453, type=int, help="Seed for the RandomTFIM model")
+parser.add_argument('--local_opt', default = False, type=bool, help="perform local optimization after RL test")
+
 args = parser.parse_args()
 
 
@@ -55,6 +59,7 @@ layers = args.network
 deterministic_act = args.deterministic
 noise = args.noise
 seed = args.seed
+local_opt = args.local_opt
 
 if measured_obs == 'Hobs':
     plotSValue = args.plotP
@@ -90,7 +95,7 @@ else :
 
 
 for Nt in P:
-    tf.reset_default_graph()
+    reset_default_graph()
     dt=tau/Nt
     if model == 'pSpin':
         env_act = qenv.pSpin(Ns_act,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
@@ -124,7 +129,7 @@ for Nt in P:
     if actType=='cont':
         head='# 1-episode,  2-action-gamma, 3-action-beta, 4-reward, 5-energy'
         data=np.zeros([Na*Nt,5])
-        summary=np.zeros([Na+1,4])
+        summary=np.zeros([Na+1,5])
         for ep in range(Na):
             if model == 'RandomTFIM':
                 J_couplings = set_couplings(Ns_rew, 0)
@@ -132,20 +137,31 @@ for Nt in P:
                 gs_energy = -J_couplings.sum()
                 print(gs_energy)
 
+            if local_opt: f_grad = lambda x : env_rew.get_fullEvo(x, grad=True)
             o_act = env_act.reset()
             o_rew = env_rew.reset()
-
+            x_guess = np.zeros(2*Nt)
             for i in range(Nt):
                 a = np.clip(get_action(o_act),0,2*np.pi)
+                x_guess[i]=a[0]
+                x_guess[i+Nt]=a[1]
                 o_rew, r_rew, d_rew, _ = env_rew.step(a)
                 o_act, r_act, d_act, _ = env_act.step(a)
                 data[ep*Nt+i,:]=np.array([ep, a[0],a[1], r_rew, rew2en(r_rew,rtype,Ns_rew)])
             #summary[ep,:]=np.array([ep,r_rew,rew2en(r_rew,rew,N),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
-            summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
+            if local_opt:
+                res = minimize(env_rew.get_fullEvo, x_guess, method="BFGS", jac=f_grad, tol=1e-5, options={'disp': True, 'maxiter': 1e5, 'gtol': 1e-5})
+                data[ep*Nt:(ep+1)*Nt,1] = res.x[:Nt]
+                data[ep*Nt:(ep+1)*Nt,2] = res.x[Nt:]
+                summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),res.x.sum(), (res.fun-gs_energy)/(-2*gs_energy)])
+            else:
+                summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
+
+            #summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
         #
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].std()
         np.savetxt(dirOut+"/actions_rew.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
         head='# 1-episode,  2-reward 3-energy, 4-time'
-        np.savetxt(dirOut+"/summary_rew.dat",summary, header=head,fmt='%03d  %.6e  %.6e  %.6e'  ) 
+        np.savetxt(dirOut+"/summary_rew.dat",summary, header=head,fmt='%03d  %.6e  %.6e  %.6e %.6e'  ) 
 
