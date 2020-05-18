@@ -101,7 +101,8 @@ for Nt in P:
     elif model == 'pSpin':
         env = qenv.pSpin(Ns,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
-        gs_energy = -Ns
+        gs_energy = np.linalg.eigvalsh(env.H_target)[0]
+        #gs_energy = -Ns
     elif model == 'TFIM':
         env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
