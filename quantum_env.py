@@ -277,7 +277,7 @@ class QuantumEnviroment():
 
         if grad :
             cpsi_t=np.zeros([self.state.size,beta_.size+1],dtype="complex");
-            cpsi_t[:,0]=np.dot(self.H1,psi_t[:,-1]);
+            cpsi_t[:,0]=np.dot(self.H_target,psi_t[:,-1]);
             
             for m in range(beta_.size):
                 U = self.get_dense_Uevol(self.E2, self.U2, -beta_[-m-1])
@@ -291,7 +291,7 @@ class QuantumEnviroment():
             Grad_b = self.Grad_x(psi_t,cpsi_t,beta_);
             return np.concatenate((Grad_g, Grad_b),axis=0)
         else:
-            return self.get_quantum_expect_val(self.H1, psi_t[:,-1])
+            return self.get_quantum_expect_val(self.H_target, psi_t[:,-1])
 
     def Grad_x(self,Psi_t,CPsi_t,beta_):
         """Compute the derivatives with respect to the parameters beta"""
@@ -347,7 +347,7 @@ class pSpin(QuantumEnviroment):
         self.measured_obs=measured_obs
         self.acttype=acttype
         self.g_target = g_target
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = 0, noise=0, Hx = self.Hx, Hz = self.Hz)
+        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = self.g_target, noise=0, Hx = self.Hx, Hz = self.Hz)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
    
