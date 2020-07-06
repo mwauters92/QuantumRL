@@ -101,18 +101,23 @@ for Nt in P:
         env_act = qenv.pSpin(Ns_act,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         env_rew = qenv.pSpin(Ns_rew,ps,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'pspin'+"P"+str(Nt)+'_N'+str(Ns_act)+'_rw'+rtype
-        gs_energy = -Ns
+        gs_energy = np.linalg.eigvalsh(env_rew.H_target)[0]
+        Emax = np.linalg.eigvalsh(env_rew.H_target)[-1]
+
     elif model == 'TFIM':
         env_act = qenv.TFIM(Ns_act,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         env_rew = qenv.TFIM(Ns_rew,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns_act)+'_rw'+rtype
         gs_energy = -Ns_rew
+        Emax=-gs_energy
     elif model == 'RandomTFIM':
         J_couplings = set_couplings(Ns_act, seed)
         env_act = qenv.RandomTFIM(Ns_act,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
-        #env_act = qenv.RandomTFIM(Ns_rew,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
+        J_couplings = set_couplings(Ns_rew, seed)
+        env_rew= qenv.RandomTFIM(Ns_rew,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns_act)+'_rw'+rtype
         gs_energy = -J_couplings.sum()
+        Emax=-gs_energy
     else:
         raise ValueError(f'Model not implemented:{model}')
 
@@ -131,12 +136,11 @@ for Nt in P:
         data=np.zeros([Na*Nt,5])
         summary=np.zeros([Na+1,5])
         for ep in range(Na):
-            if model == 'RandomTFIM':
+            if model == 'RandomTFIM' and ep > 0:
                 J_couplings = set_couplings(Ns_rew, 0)
                 env_rew = qenv.RandomTFIM(Ns_rew,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
                 gs_energy = -J_couplings.sum()
-                print(gs_energy)
-
+            print(gs_energy)
             if local_opt: f_grad = lambda x : env_rew.get_fullEvo(x, grad=True)
             o_act = env_act.reset()
             o_rew = env_rew.reset()
@@ -151,11 +155,14 @@ for Nt in P:
             #summary[ep,:]=np.array([ep,r_rew,rew2en(r_rew,rew,N),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
             if local_opt:
                 res = minimize(env_rew.get_fullEvo, x_guess, method="BFGS", jac=f_grad, tol=1e-5, options={'disp': True, 'maxiter': 1e5, 'gtol': 1e-5})
+                r_rew=env_rew.get_fullEvo(x_guess)
                 data[ep*Nt:(ep+1)*Nt,1] = res.x[:Nt]
                 data[ep*Nt:(ep+1)*Nt,2] = res.x[Nt:]
-                summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),res.x.sum(), (res.fun-gs_energy)/(-2*gs_energy)])
+                summary[ep,:]=np.array([ep,res.nit,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(Emax-gs_energy),res.x.sum(), (res.fun-gs_energy)/(Emax-gs_energy)])
+                data[ep*Nt:(ep+1)*Nt,1]=res.x[:Nt]
+                data[ep*Nt:(ep+1)*Nt,2]=res.x[Nt:]
             else:
-                summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
+                summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(Emax-gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
 
             #summary[ep,:]=np.array([ep,r_rew,(rew2en(r_rew,rtype,Ns_rew)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2])])
         #
