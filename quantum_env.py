@@ -917,3 +917,102 @@ class RandomTFIM(QuantumEnviroment):
             Grad_g[k]=np.dot(CPsi_t[M-k],np.dot(self.H1,Psi_t[k])).trace()
         return 2*Grad_g.imag
 
+
+class SKmodel(QuantumEnvironment):
+    '''Child class of QuantumEnviroment. Add specific model (Sherrington-Kirkpatric fully -connected spin glass) to the class. Can deal only with small systems (N<12).
+       Parameters:
+           N (int): number of spin variables
+           seed (int): sets the seed for the random couplings. if seed=0 the seed is taken from clock           time, if seed=1 couplings are uniform, otherwise seed=seed
+           measured_obs (str): 
+            "Hobs" -> average transverse magnetization and interaction energy
+             
+
+       
+    '''
+    def __init__(self, N, J_couplings, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="Hobs",seed=856741):
+        # initilize model variables
+        self.N = N
+        self.state = None
+        self.m = 0
+        self.P = P
+        self.g_target=g_target
+        self.rtype = rtype
+        self.noise = noise
+        self.dt = dt
+        self.seed = seed
+        self.J_couplings = np.array(J_couplings) # self.set_couplings(N,seed)
+
+        self.Hx_tilde = self.set_Hx(N)
+        self.Hz_tilde = self.set_Hz(N,self.J_couplings)
+
+        self.measured_obs = measured_obs
+        self.acttype=acttype
+        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx_tilde, Hz = self.Hz_tilde)
+        self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
+        self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
+        
+        self.psi_start = np.zeros([2 * self.N, 2 * self.N])
+        for i in range(self.N, 2 * self.N): 
+            self.psi_start[i][i] = 1
+
+    def set_couplings(self, N, seed):
+        if seed > 1 :
+            couplings = np.random.RandomState(seed=seed).randint(2,size=int(N*(N-1)/2))
+        elif seed == 1 :
+            couplings = np.ones(int(N*(N-1)/2))
+        else :
+            couplings = np.random.RandomState(seed=None).randint(2,size=int(N*(N-1)/2))
+
+        couplings_mat = np.zeros(N,N)
+        couplings_mat[np.triu_indeces(N,k=1)] = couplings
+
+        return couplings_mat + couplings_mat.T 
+
+    
+    def set_Hx(self,N):
+        """Transverse field S_x in the z basis representation.
+           Parameters:
+               N (int): chain length
+           Returns:
+               Sx (real): x component of the total spin
+        """
+        L = 2**N
+        Sx=np.zeros([L,L])
+        for j1 in range(L-1):
+            for j2 in np.arange(j1+1,L):
+                j1j2_diff = np.unpackbit(np.array([j2-j1],dtype='uint8'))
+                if j1j2.sum() == 1:
+                    Sx[j1,j2] = 1
+                    Sx[j2,j1] = 1
+        return -Sx
+    
+
+    def configurationEnergy(x,couplings_mat):
+        '''Configuration energy of a single basis vector,
+           represented by the integer number x
+           Parameters:
+               x (int): natural number representing the basis vector x
+               couplings (int): symmetric matrix of the random couplings
+           
+           Returns:
+               energy_glass (real): interaction energy of the configuration x
+         '''
+        x_extended = np.unpackbit(np.array([x],dtype='uint8'))
+        x_extended = x_extended*2-1
+        
+        return np.dot(x_extended.T,np.dot(couplings_mat,x_extended))
+        
+    def set_Hz(self,N,couplings_mat):
+        """Diagonal interaction energy of Sherrignton Kirkpatric model
+           Parameters:
+               N (int): chain length
+               couplings_mat (int): symmetric matrix of random couplings
+           Returns:
+               Hz (real): interaction energy
+        """
+        L = 2**N
+        Hz=np.zeros([L,L])
+        for x in range(L)
+            Hz[x,x] = configurationEnergy(x,couplings_mat)
+        
+        return Hz
