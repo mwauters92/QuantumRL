@@ -43,7 +43,7 @@ SIGMA_Z = np.array([[1, 0],[0, -1]])
 #--------------------------------------
 # General quantum enviroment for Reinforcement Learning
 #--------------------------------------
-class QuantumEnviroment():
+class QuantumEnvironment():
     '''
     General class that is passed to Spinningup reinforcment learning routines
     Variables:
@@ -318,7 +318,7 @@ class QuantumEnviroment():
         pass  
 
 # ------------------------------------
-# End of class QuantumEnviroment
+# End of class QuantumEnvironment
 # ------------------------------------
 
 
@@ -326,8 +326,8 @@ class QuantumEnviroment():
 # Model class for pSpin model
 #-------------------------------------
 
-class pSpin(QuantumEnviroment):
-    '''Children class of QuantumEnviroment. Add specific model (pspin) to the class.
+class pSpin(QuantumEnvironment):
+    '''Children class of QuantumEnvironment. Add specific model (pspin) to the class.
        Paramenters:
            N (int): number of spin variables
            ps (int): rank of the interaction
@@ -347,7 +347,7 @@ class pSpin(QuantumEnviroment):
         self.measured_obs=measured_obs
         self.acttype=acttype
         self.g_target = g_target
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = self.g_target, noise=0, Hx = self.Hx, Hz = self.Hz)
+        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=N, g_target = self.g_target, noise=0, Hx = self.Hx, Hz = self.Hz)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
    
@@ -435,14 +435,14 @@ class pSpin(QuantumEnviroment):
 # Model class for single spin 1/2
 #-------------------------------------
 
-class SingleSpin(QuantumEnviroment):
-    '''Children class of QuantumEnviroment. Add specific model (single spin 1/2) to the class.
-       It passes to QuantumEnviroment only the pauli matrices
+class SingleSpin(QuantumEnvironment):
+    '''Children class of QuantumEnvironment. Add specific model (single spin 1/2) to the class.
+       It passes to QuantumEnvironment only the pauli matrices
     '''
 
     def __init__(self, P, rtype, dt, acttype, g_target = 0, noise=0):
         
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, g_target = 0, noise=0, Hx = -np.copy(SIGMA_X), Hz = -np.copy(SIGMA_Z) )
+        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, g_target = 0, noise=0, Hx = -np.copy(SIGMA_X), Hz = -np.copy(SIGMA_Z) )
    
 
 #---------------------------------------
@@ -452,8 +452,8 @@ class SingleSpin(QuantumEnviroment):
 #-------------------------------------
 # Model class for single spin 1/2
 #-------------------------------------
-class TFIM(QuantumEnviroment):
-    '''Child class of QuantumEnviroment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
+class TFIM(QuantumEnvironment):
+    '''Child class of QuantumEnvironment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
        Paramenters:
            N (int): number of spin variables
            measured_obs (str): 
@@ -489,7 +489,7 @@ class TFIM(QuantumEnviroment):
             k = self.k[i_k]
             Hx = -2 * SIGMA_Z
             Hz = 2 * np.sin(k) * SIGMA_X - 2 * np.cos(k) * SIGMA_Z
-            model = QuantumEnviroment(P, rtype, dt, acttype, g_target = g_target, noise = noise, Hx = Hx, Hz = Hz)
+            model = QuantumEnvironment(P, rtype, dt, acttype, g_target = g_target, noise = noise, Hx = Hx, Hz = Hz)
             self.two_lv_models.append(model)
             self.Hx.append(Hx)
             self.Hz.append(Hz)
@@ -658,8 +658,8 @@ class TFIM(QuantumEnviroment):
                 energy_tot += model.get_fullEvo(x,grad)
             return energy_tot
 
-class RandomTFIM(QuantumEnviroment):
-    '''Child class of QuantumEnviroment. Add specific model (random Couplings Ising Model or RandomIsing) to the class. We use Jordan-Wigner transormation to map the RandomIsing model to free fermions.
+class RandomTFIM(QuantumEnvironment):
+    '''Child class of QuantumEnvironment. Add specific model (random Couplings Ising Model or RandomIsing) to the class. We use Jordan-Wigner transormation to map the RandomIsing model to free fermions.
        Parameters:
            N (int): number of spin variables
            seed (int): sets the seed for the random couplings. if seed=0 the seed is taken from clock           time, if seed=1 couplings are uniform, otherwise seed=seed
@@ -689,7 +689,7 @@ class RandomTFIM(QuantumEnviroment):
 
         self.measured_obs = measured_obs
         self.acttype=acttype
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx_tilde, Hz = self.Hz_tilde)
+        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx_tilde, Hz = self.Hz_tilde)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
         
@@ -919,7 +919,7 @@ class RandomTFIM(QuantumEnviroment):
 
 
 class SKmodel(QuantumEnvironment):
-    '''Child class of QuantumEnviroment. Add specific model (Sherrington-Kirkpatric fully -connected spin glass) to the class. Can deal only with small systems (N<12).
+    '''Child class of QuantumEnvironment. Add specific model (Sherrington-Kirkpatric fully -connected spin glass) to the class. Can deal only with small systems (N<12).
        Parameters:
            N (int): number of spin variables
            seed (int): sets the seed for the random couplings. if seed=0 the seed is taken from clock           time, if seed=1 couplings are uniform, otherwise seed=seed
@@ -947,7 +947,7 @@ class SKmodel(QuantumEnvironment):
 
         self.measured_obs = measured_obs
         self.acttype=acttype
-        QuantumEnviroment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx_tilde, Hz = self.Hz_tilde)
+        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx_tilde, Hz = self.Hz_tilde)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
         
@@ -1012,7 +1012,7 @@ class SKmodel(QuantumEnvironment):
         """
         L = 2**N
         Hz=np.zeros([L,L])
-        for x in range(L)
+        for x in range(L):
             Hz[x,x] = configurationEnergy(x,couplings_mat)
         
         return Hz
