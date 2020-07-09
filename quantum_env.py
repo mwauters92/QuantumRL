@@ -555,10 +555,9 @@ class TFIM(QuantumEnvironment):
         elif self.measured_obs == "Hobs":
             # get observable shape
             if get_only_info:
-                obs_shape = (2 * self.N,)
                 obs_low=-1
                 obs_high=1
-                obs_shape = (2,) #delete in future
+                obs_shape = (2,) 
                 return obs_shape, obs_low, obs_high
             # get averages of Hx and Hz
             avg_Hx = 0.
@@ -581,6 +580,29 @@ class TFIM(QuantumEnvironment):
             obs_zz = (avg_sum_szsz / self.N) * np.ones(self.N)
             obs = np.concatenate([obs_x, obs_zz])
             obs = np.array([avg_sum_sx, avg_sum_szsz])/self.N #delete in future  
+
+        elif self.measured_obs == "hzr":
+            # get observable shape
+            if get_only_info:
+                obs_low=-1
+                obs_high=1
+                obs_shape = (1,) 
+                return obs_shape, obs_low, obs_high
+            # get averages of Hz
+            avg_Hz = 0.
+            for i_k in range(self.Nk):
+                two_lv_state = state[i_k]
+                two_lv_model = self.two_lv_models[i_k]
+                #print('i_k=',i_k,' Nk=', self.Nk, ' lenHx=',len(self.Hx), ' lenHz=',len(self.Hz))
+                Hz_k = self.Hz[i_k]
+                avg_Hz = avg_Hz + two_lv_model.get_quantum_expect_val(Hz_k, two_lv_state)
+            
+            # get  averages 
+            avg_sum_szsz = avg_Hz
+
+            # get local observables for each site
+            obs_zz = (avg_sum_szsz / self.N) * np.ones(self.N)
+            obs = avg_sum_szsz/self.N   
 
         elif self.measured_obs == "HCorr":
             # get observable shape
