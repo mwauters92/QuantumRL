@@ -41,6 +41,48 @@ SIGMA_Y = np.array([[0, -1j],[1j, 0]])
 SIGMA_Z = np.array([[1, 0],[0, -1]])
 
 #--------------------------------------
+# Useful functions
+#--------------------------------------
+
+def set_couplings( N, seed, model = "RandomTFIM"):
+
+    if model == "RandomTFIM":
+        if seed > 1 :
+            couplings = np.random.RandomState(seed=seed).random(N)
+        elif seed == 1 :
+            couplings = np.ones(N)
+        else :
+            couplings = np.random.RandomState(seed=None).random(N)
+        return couplings
+
+    elif model == "SKglass":
+        if seed > 1 :
+            couplings = np.random.RandomState(seed=seed).randint(2,size=int(N*(N-1)/2))
+        elif seed == 1 :
+            couplings = np.ones(int(N*(N-1)/2))
+        else :
+            couplings = np.random.RandomState(seed=None).randint(2,size=int(N*(N-1)/2))
+
+        couplings_mat = np.zeros([N,N])
+        couplings_mat[np.triu_indices(N,k=1)] = 2*couplings-1
+        print(couplings_mat)
+        return couplings_mat + couplings_mat.T
+
+def int2bin(x,L):
+    ''' convert an integer number x in an array of L bits
+        if x is non integer, the function extract the int part of x
+    '''
+    x = int(x)
+    if (L  <= np.log2(x)): 
+        raise ValueError(f'L={L} is too short to represent {x} in binary form')
+    
+    xbin = np.zeros(L)
+    for j in range(L):
+        p2 = 2**(L-1-j)
+        xbin[j], x = np.divmod(x,p2) 
+
+    return xbin
+#--------------------------------------
 # General quantum enviroment for Reinforcement Learning
 #--------------------------------------
 class QuantumEnvironment():
@@ -940,7 +982,7 @@ class RandomTFIM(QuantumEnvironment):
         return 2*Grad_g.imag
 
 
-class SKmodel(QuantumEnvironment):
+class SKglass(QuantumEnvironment):
     '''Child class of QuantumEnvironment. Add specific model (Sherrington-Kirkpatric fully -connected spin glass) to the class. Can deal only with small systems (N<12).
        Parameters:
            N (int): number of spin variables
@@ -951,9 +993,10 @@ class SKmodel(QuantumEnvironment):
 
        
     '''
-    def __init__(self, N, J_couplings, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="Hobs",seed=856741):
+    def __init__(self, L, J_couplings, P, rtype, dt, acttype, g_target = 0, noise=0, measured_obs="Hobs",seed=856741):
         # initilize model variables
-        self.N = N
+        self.L = L
+        self.N = 2**L
         self.state = None
         self.m = 0
         self.P = P
@@ -964,18 +1007,16 @@ class SKmodel(QuantumEnvironment):
         self.seed = seed
         self.J_couplings = np.array(J_couplings) # self.set_couplings(N,seed)
 
-        self.Hx_tilde = self.set_Hx(N)
-        self.Hz_tilde = self.set_Hz(N,self.J_couplings)
+        self.Hx = self.set_Hx(self.N)
+        self.Hz = self.set_Hz(self.N,self.J_couplings)
 
         self.measured_obs = measured_obs
         self.acttype=acttype
-        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=N, g_target = g_target, noise=noise, Hx = self.Hx_tilde, Hz = self.Hz_tilde)
+        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=self.N, g_target = g_target, noise=noise, Hx = self.Hx, Hz = self.Hz)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
         
-        self.psi_start = np.zeros([2 * self.N, 2 * self.N])
-        for i in range(self.N, 2 * self.N): 
-            self.psi_start[i][i] = 1
+        self.psi_start = np.ones(self.N)/np.sqrt(self.N)
 
     def set_couplings(self, N, seed):
         if seed > 1 :
@@ -994,22 +1035,22 @@ class SKmodel(QuantumEnvironment):
     def set_Hx(self,N):
         """Transverse field S_x in the z basis representation.
            Parameters:
-               N (int): chain length
+               N (int): 2**L, hilbert space size
            Returns:
                Sx (real): x component of the total spin
         """
-        L = 2**N
-        Sx=np.zeros([L,L])
-        for j1 in range(L-1):
-            for j2 in np.arange(j1+1,L):
-                j1j2_diff = np.unpackbit(np.array([j2-j1],dtype='uint8'))
-                if j1j2.sum() == 1:
+        Sx=np.zeros([N,N])
+        for j1 in range(N-1):
+            for j2 in np.arange(j1+1,N):
+                #j1j2_diff = np.unpackbits(np.array([j2-j1],dtype='uint8'))
+                j1j2_diff = int2bin(j2-j1,self.L)
+                if j1j2_diff.sum() == 1:
                     Sx[j1,j2] = 1
                     Sx[j2,j1] = 1
         return -Sx
     
 
-    def configurationEnergy(x,couplings_mat):
+    def configurationEnergy(self,x,couplings_mat):
         '''Configuration energy of a single basis vector,
            represented by the integer number x
            Parameters:
@@ -1019,7 +1060,7 @@ class SKmodel(QuantumEnvironment):
            Returns:
                energy_glass (real): interaction energy of the configuration x
          '''
-        x_extended = np.unpackbit(np.array([x],dtype='uint8'))
+        x_extended = int2bin(x,self.L)
         x_extended = x_extended*2-1
         
         return np.dot(x_extended.T,np.dot(couplings_mat,x_extended))
@@ -1027,14 +1068,45 @@ class SKmodel(QuantumEnvironment):
     def set_Hz(self,N,couplings_mat):
         """Diagonal interaction energy of Sherrignton Kirkpatric model
            Parameters:
-               N (int): chain length
+               N (int): 2**L, hilbert space size
                couplings_mat (int): symmetric matrix of random couplings
            Returns:
                Hz (real): interaction energy
         """
-        L = 2**N
-        Hz=np.zeros([L,L])
-        for x in range(L):
-            Hz[x,x] = configurationEnergy(x,couplings_mat)
-        
-        return Hz
+        Hz=np.zeros([N,N])
+        for x in range(N):
+            Hz[x,x] = self.configurationEnergy(x,couplings_mat)
+        return -Hz
+
+    def get_observable(self, state, get_only_info=False):
+        if self.measured_obs == "tomography":
+            if get_only_info:
+                obs_shape = (2 *  self.N+2,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            state_real = np.real(state)
+            state_imag = np.imag(state)
+            obs = np.concatenate((state_real, state_imag))
+
+        elif self.measured_obs == "Hobs":
+            # get observable shape
+            if get_only_info:
+                obs_shape = (2,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            # get averages of Hx and Hz
+            avg_Hx = np.vdot(state,np.dot(self.Hx,state))
+            avg_Hz = np.vdot(state,np.dot(self.Hz,state))
+            obs = np.array([avg_Hx, avg_Hz])/self.L
+
+        else:
+            raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
+
+        return obs.reshape(-1)
+
+
+    def get_observable_info(self):
+        return self.get_observable(None, get_only_info=True)
+
