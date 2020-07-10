@@ -68,7 +68,7 @@ ps = args.ps                      # interaction rank of the pSpin model
 hfield = args.hfield
 Na = args.nvalidation
 
-def set_couplings( N, seed):
+'''def set_couplings( N, seed):
     if seed > 1 :
         couplings = np.random.RandomState(seed=seed).random(N)
     elif seed == 1 :
@@ -76,7 +76,7 @@ def set_couplings( N, seed):
     else :
         couplings = np.random.RandomState(seed=None).random(N)
     return couplings
-
+'''
 
 if noise == 0 :
     if hfield > 0:
@@ -108,9 +108,14 @@ for Nt in P:
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
     elif model == 'RandomTFIM':
-        J_couplings = set_couplings(Ns, seed)
+        J_couplings = qenv.set_couplings(Ns, seed)
         env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
+        gs_energy = -J_couplings.sum()
+    elif model == 'SKglass':
+        J_couplings = qenv.set_couplings(Ns, seed, model = 'SKglass')
+        env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
+        dirOut=dirO+'SKglass'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -J_couplings.sum()
     else:
         raise ValueError(f'Model not implemented:{model}')
