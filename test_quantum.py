@@ -114,9 +114,10 @@ for Nt in P:
         gs_energy = -J_couplings.sum()
     elif model == 'SKglass':
         J_couplings = qenv.set_couplings(Ns, seed, model = 'SKglass')
-        env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
+        env = qenv.SKglass(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'SKglass'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
-        gs_energy = -J_couplings.sum()
+        gs_energy = env.Hz.min()
+        print(gs_energy)
     else:
         raise ValueError(f'Model not implemented:{model}')
     
@@ -178,7 +179,7 @@ for Nt in P:
                 summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
                 result_locOpt.append([res.fun, res.x.sum(), res.nit, res.nfev])
             else:
-                summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
+                summary[ep,:]=np.array([ep,rew2en(r,rtype,Ns)/Ns,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
         
         if local_opt: result_locOpt.append(np.array(result_locOpt).mean(axis=0))
         summary[-1,:]=summary[:-1,:].mean(axis=0)
