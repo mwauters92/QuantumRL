@@ -1076,7 +1076,7 @@ class SKglass(QuantumEnvironment):
         Hz=np.zeros([N,N])
         for x in range(N):
             Hz[x,x] = self.configurationEnergy(x,couplings_mat)
-        return -Hz
+        return -Hz/np.sqrt(self.L)
 
     def get_observable(self, state, get_only_info=False):
         if self.measured_obs == "tomography":
