@@ -107,16 +107,19 @@ for Nt in P:
         env = qenv.TFIM(Ns,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise)
         dirOut=dirO+'TFIM'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -Ns
+        Emax = Ns
     elif model == 'RandomTFIM':
         J_couplings = qenv.set_couplings(Ns, seed)
         env = qenv.RandomTFIM(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'RandomIsing'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = -J_couplings.sum()
+        Emax = - gs_energy
     elif model == 'SKglass':
         J_couplings = qenv.set_couplings(Ns, seed, model = 'SKglass')
         env = qenv.SKglass(Ns,J_couplings,Nt,rtype,dt,actType,measured_obs=measured_obs, g_target=hfield ,noise=noise,seed=1)
         dirOut=dirO+'SKglass'+"P"+str(Nt)+'_N'+str(Ns)+'_rw'+rtype
         gs_energy = env.Hz.min()
+        Emax = env.Hz.max()
         print(gs_energy)
     else:
         raise ValueError(f'Model not implemented:{model}')
@@ -176,10 +179,10 @@ for Nt in P:
                 res = minimize(env.get_fullEvo, x_guess, method="BFGS", jac=f_grad, tol=1e-5, options={'disp': True, 'maxiter': 1e5, 'gtol': 1e-5})
                 data_opt[ep*Nt:(ep+1)*Nt,0] = res.x[:Nt]
                 data_opt[ep*Nt:(ep+1)*Nt,1] = res.x[Nt:]
-                summary[ep,:]=np.array([ep,r,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(-2*gs_energy)])
+                summary[ep,:]=np.array([ep,rew2en(r,rtype,env.N)/Ns,(rew2en(r,rtype,env.N)-gs_energy)/(Emax - gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), (res.fun-gs_energy)/(Emax-gs_energy)])
                 result_locOpt.append([res.fun, res.x.sum(), res.nit, res.nfev])
             else:
-                summary[ep,:]=np.array([ep,rew2en(r,rtype,Ns)/Ns,(rew2en(r,rtype,Ns)-gs_energy)/(-2*gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
+                summary[ep,:]=np.array([ep,rew2en(r,rtype,env.N)/Ns,(rew2en(r,rtype,env.N)-gs_energy)/(Emax - gs_energy),np.sum(data[ep*Nt:(ep+1)*Nt,1:2]), 0 ])
         
         if local_opt: result_locOpt.append(np.array(result_locOpt).mean(axis=0))
         summary[-1,:]=summary[:-1,:].mean(axis=0)
