@@ -985,10 +985,12 @@ class RandomTFIM(QuantumEnvironment):
 class SKglass(QuantumEnvironment):
     '''Child class of QuantumEnvironment. Add specific model (Sherrington-Kirkpatric fully -connected spin glass) to the class. Can deal only with small systems (N<12).
        Parameters:
-           N (int): number of spin variables
-           seed (int): sets the seed for the random couplings. if seed=0 the seed is taken from clock           time, if seed=1 couplings are uniform, otherwise seed=seed
+           L (int): number of spin variables
+           J_coulings (int): LxL matrix symmetric. the ij element is the coupling between the i-th and the j-th spins.
            measured_obs (str): 
             "Hobs" -> average transverse magnetization and interaction energy
+            "tomography" -> full tomography of the state
+            "hzr" -> expectation value of Hz only.
              
 
        
@@ -1012,7 +1014,7 @@ class SKglass(QuantumEnvironment):
 
         self.measured_obs = measured_obs
         self.acttype=acttype
-        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=self.N, g_target = g_target, noise=noise, Hx = self.Hx, Hz = self.Hz)
+        QuantumEnvironment.__init__(self, P, rtype, dt, acttype, N=self.L, g_target = g_target, noise=noise, Hx = self.Hx, Hz = self.Hz)
         self.obs_shape, self.obs_low, self.obs_high = self.get_observable_info()
         self.set_RL_params(self.acttype, self.obs_shape, self.obs_low, self.obs_high)
         
@@ -1100,6 +1102,17 @@ class SKglass(QuantumEnvironment):
             avg_Hx = np.vdot(state,np.dot(self.Hx,state))
             avg_Hz = np.vdot(state,np.dot(self.Hz,state))
             obs = np.array([avg_Hx, avg_Hz])/self.L
+
+        elif self.measured_obs == "hzr":
+            # get observable shape
+            if get_only_info:
+                obs_shape = (1,)
+                obs_low = -1
+                obs_high = 1
+                return obs_shape, obs_low, obs_high
+            # get averages of Hx and Hz
+            avg_Hz = np.vdot(state,np.dot(self.Hz,state))
+            obs = avg_Hz/self.L
 
         else:
             raise ValueError(f'Impossible to measure observable:{self.measured_obs} not valid')
