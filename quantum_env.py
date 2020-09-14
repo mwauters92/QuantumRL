@@ -6,12 +6,6 @@ import matplotlib.pyplot as plt
 from IPython import embed
 from gym import spaces
 
-# ---------------------------------------
-#
-# ---------------------------------------
-# EQUIVALENT OF GYM FOR QUANTUM ENVIRONMENT
-# ---------------------------------------
-
 
 #===============================================================================
 # class QUANTUM(gym.Env):
@@ -166,7 +160,6 @@ class QuantumEnvironment():
         if self.acttype == 'bin':
             self.action_space = spaces.Discrete(2) 
         elif self.acttype == 'cont':
-            # TODO issue with action space
             self.action_space = spaces.Box(low= 0., high=2*np.pi, shape=(2,), dtype=np.float32)
 
     def get_observable(self, state):
@@ -175,7 +168,7 @@ class QuantumEnvironment():
         In the actual implementation it is just the full state stored in 
         a real vector.
         Parameters:
-            state (complex): complex vector of dmnesion self.Hdim describing the system state
+            state (complex): complex vector of dimnesion self.Hdim describing the system state
         Returns:
         '''     
         state_real = np.real(state)
@@ -492,7 +485,7 @@ class SingleSpin(QuantumEnvironment):
 # ------------------------------------
 
 #-------------------------------------
-# Model class for single spin 1/2
+# Model class for transverse field Ising model
 #-------------------------------------
 class TFIM(QuantumEnvironment):
     '''Child class of QuantumEnvironment. Add specific model (Transfverse field Ising Model or TFIM) to the class. We use the pseudo-spin picture to decompse the TFIM into a collection of independent two level models. Each model is indicized my a pseudo momenta k. Also see arXiv:1906.08948 .
@@ -500,7 +493,7 @@ class TFIM(QuantumEnvironment):
            N (int): number of spin variables
            measured_obs (str): 
             "pesudospin-tomography" ->
-            "sx,sz*sz" -> local observables O_x = sigma_x, O_zz = sigma_z*sigma_z
+            "Hobs" -> local observables O_x = sigma_x, O_zz = sigma_z*sigma_z
 
        
        Methods:
@@ -721,6 +714,10 @@ class TFIM(QuantumEnvironment):
             for model in self.two_lv_models:
                 energy_tot += model.get_fullEvo(x,grad)
             return energy_tot
+
+#--------------------------------------------------------------
+# Class for transverse field Ising model with random couplings
+#-------------------------------------------------------------
 
 class RandomTFIM(QuantumEnvironment):
     '''Child class of QuantumEnvironment. Add specific model (random Couplings Ising Model or RandomIsing) to the class. We use Jordan-Wigner transormation to map the RandomIsing model to free fermions.
@@ -981,6 +978,9 @@ class RandomTFIM(QuantumEnvironment):
             Grad_g[k]=np.dot(CPsi_t[M-k],np.dot(self.H1,Psi_t[k])).trace()
         return 2*Grad_g.imag
 
+#-------------------------------------------------------------------------
+# class for Sherrington-Kirkpatrick spin glass
+#-------------------------------------------------------------------------
 
 class SKglass(QuantumEnvironment):
     '''Child class of QuantumEnvironment. Add specific model (Sherrington-Kirkpatric fully -connected spin glass) to the class. Can deal only with small systems (N<12).
