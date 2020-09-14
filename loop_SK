@@ -1,0 +1,15 @@
+#!/bin/sh
+
+#vcmfile=Vcm.dat
+#rm -f $vcmfile
+for Ns in 8 #8 16 32 64 128 
+  do
+  for P in 4 #$(seq 1 1 30) 
+    do
+    python RunningRL.py --model 'SKglass'  --obs 'Hobs' --Pvars $P $((P+1)) 1 --network 8 8  --rtype 'energy' --epochs 1024 --nstep $((P*100)) --N $Ns 
+    #python test_quantum.py --model 'SKglass' --obs 'Hobs' --Pvars $P $((P+1)) 1 --network 32 16  --rtype 'energy' --epochs 1 --nstep $((P*100)) --N $Ns --nvalidation 10 # --local_opt True #--hfield 0.5
+    #python test_twoSize.py --model 'SKglass' --obs 'Hobs' --Pvars $P $((P+1)) 1 --network 32 16  --rtype 'energy' --epochs 1 --nstep $((P*100)) --N_act $Ns --nvalidation 10  --local_opt True  > test.tmp
+    rm run.tmp
+    rm test.tmp
+  done
+done
