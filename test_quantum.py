@@ -178,6 +178,7 @@ for Nt in P:
         if local_opt: result_locOpt.append(np.array(result_locOpt).mean(axis=0))
         summary[-1,:]=summary[:-1,:].mean(axis=0)
         summary[-1,0]=summary[:-1,2].min()
+        summary[-1,3]=summary[:-1,4].min()
 
         head='# 1-episode,  2-action-gamma, 3-action-beta, 4-reward, 5-energy'
         np.savetxt(dirOut+"/actions.dat",data, header=head,fmt='%03d  %.6e  %.6e  %.6e  %.6e') 
